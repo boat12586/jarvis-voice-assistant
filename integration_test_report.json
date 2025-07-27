@@ -1,0 +1,54 @@
+{
+  "test_summary": {
+    "total_tests": 6,
+    "passed_tests": 0,
+    "failed_tests": 6,
+    "success_rate": 0.0,
+    "total_time": 10.027968168258667,
+    "timestamp": "2025-07-18T18:24:18.110783"
+  },
+  "test_results": [
+    {
+      "test_name": "Core Service Health Check",
+      "success": false,
+      "message": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v2/health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fd8cf59ac50>: Failed to establish a new connection: [Errno 111] Connection refused'))",
+      "duration": 0.011677026748657227,
+      "timestamp": "2025-07-18T18:24:18.105593"
+    },
+    {
+      "test_name": "Audio Service Health Check",
+      "success": false,
+      "message": "HTTPConnectionPool(host='localhost', port=8001): Max retries exceeded with url: /api/v2/audio/health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fd8cf59b5b0>: Failed to establish a new connection: [Errno 111] Connection refused'))",
+      "duration": 0.0012183189392089844,
+      "timestamp": "2025-07-18T18:24:18.107055"
+    },
+    {
+      "test_name": "Web Service Health Check",
+      "success": false,
+      "message": "HTTPConnectionPool(host='localhost', port=3000): Max retries exceeded with url: / (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fd8cf59be20>: Failed to establish a new connection: [Errno 111] Connection refused'))",
+      "duration": 0.0007901191711425781,
+      "timestamp": "2025-07-18T18:24:18.107966"
+    },
+    {
+      "test_name": "Nginx Health Check",
+      "success": false,
+      "message": "HTTPConnectionPool(host='localhost', port=80): Max retries exceeded with url: /health (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fd8cf59b9a0>: Failed to establish a new connection: [Errno 111] Connection refused'))",
+      "duration": 0.0012824535369873047,
+      "timestamp": "2025-07-18T18:24:18.109351"
+    },
+    {
+      "test_name": "Guest User Creation",
+      "success": false,
+      "message": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v2/guest (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fd8cf59b0d0>: Failed to establish a new connection: [Errno 111] Connection refused'))",
+      "duration": 0.0005400180816650391,
+      "timestamp": "2025-07-18T18:24:18.110010"
+    },
+    {
+      "test_name": "Plugin System Listing",
+      "success": false,
+      "message": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/v2/plugins (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fd8cf59ac20>: Failed to establish a new connection: [Errno 111] Connection refused'))",
+      "duration": 0.0005328655242919922,
+      "timestamp": "2025-07-18T18:24:18.110641"
+    }
+  ]
+}

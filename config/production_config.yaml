@@ -1,0 +1,194 @@
+# JARVIS Production Configuration
+# Optimized for production deployment
+
+# Environment
+environment: production
+version: "2.0.1"
+
+# AI Models
+ai:
+  llm:
+    model_name: deepseek-ai/deepseek-r1-distill-llama-8b
+    max_context_length: 8192
+    temperature: 0.7
+    max_tokens: 512
+    quantization: 8bit
+    device: auto
+    fallback_model: microsoft/DialoGPT-medium
+    timeout: 30
+    
+  embedding:
+    model: mixedbread-ai/mxbai-embed-large-v1
+    dimensions: 1024
+    batch_size: 32
+
+# Voice Processing
+voice:
+  sample_rate: 16000
+  chunk_size: 1024
+  
+  # Wake word settings
+  wake_word:
+    enabled: true
+    phrases: ["hey jarvis", "jarvis", "ok jarvis"]
+    confidence_threshold: 0.7
+    timeout: 2.0
+  
+  # Speech recognition
+  whisper:
+    model_size: base  # balance of speed/accuracy
+    language: auto
+    timeout: 5.0
+    
+  # Text-to-speech
+  tts:
+    model: tts_models/en/ljspeech/tacotron2-DDC
+    speed: 1.0
+    volume: 0.8
+    cache_enabled: true
+
+# Memory and Storage
+memory:
+  enabled: true
+  max_conversations: 1000
+  auto_save_interval: 300  # 5 minutes
+  backup_enabled: true
+  backup_interval: 3600   # 1 hour
+  retention_days: 90
+
+# System Configuration
+system:
+  log_level: INFO
+  log_file: logs/jarvis_production.log
+  log_rotation_size_mb: 100
+  log_max_files: 10
+  
+  # Performance
+  max_memory_gb: 6
+  gpu_enabled: true
+  cpu_threads: 4
+  
+  # Security
+  require_authentication: false
+  session_timeout_hours: 24
+  encrypt_conversations: true
+  
+  # Features
+  enable_gui: false          # Disabled in production
+  enable_voice_commands: true
+  enable_continuous_listening: true
+  enable_wake_word: true
+  enable_telemetry: true
+
+# Monitoring
+monitoring:
+  enabled: true
+  metrics_port: 8081
+  health_check_interval: 30
+  
+  # Prometheus metrics
+  prometheus:
+    enabled: true
+    port: 8082
+    path: /metrics
+    
+  # Performance tracking
+  track_response_times: true
+  track_memory_usage: true
+  track_model_performance: true
+
+# API Settings (for future web interface)
+api:
+  enabled: true
+  host: 0.0.0.0
+  port: 8080
+  cors_enabled: true
+  rate_limiting: true
+  max_requests_per_minute: 60
+
+# User Interface
+ui:
+  theme: dark
+  colors:
+    primary: '#00d4ff'
+    secondary: '#0099cc'
+    accent: '#ff6b35'
+    background: '#1a1a1a'
+  
+  # Production UI settings
+  show_debug_info: false
+  enable_advanced_controls: false
+  auto_hide_after_minutes: 30
+
+# Data Management
+data:
+  directory: data
+  cache_directory: data/cache
+  models_directory: models
+  temp_directory: temp
+  
+  # Cleanup settings
+  auto_cleanup_enabled: true
+  cleanup_interval_hours: 24
+  temp_file_retention_hours: 1
+  
+# Backup and Recovery
+backup:
+  enabled: true
+  directory: backups
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention_days: 30
+  compress: true
+  
+  # What to backup
+  include_conversations: true
+  include_user_profiles: true
+  include_configurations: true
+  include_models: false  # Too large
+
+# Security Settings
+security:
+  # Encryption
+  encrypt_data_at_rest: true
+  encryption_key_file: /app/config/encryption.key
+  
+  # Access control
+  allowed_hosts: ["localhost", "127.0.0.1"]
+  require_api_key: false
+  
+  # Privacy
+  anonymous_usage_stats: true
+  data_retention_policy: strict
+  
+# Notifications (for future)
+notifications:
+  enabled: false
+  email:
+    enabled: false
+    smtp_server: ""
+    smtp_port: 587
+    username: ""
+    password: ""
+  
+  webhook:
+    enabled: false
+    url: ""
+    
+# Integration Settings
+integrations:
+  # Cloud AI services (optional)
+  openai:
+    enabled: false
+    api_key: ""
+    model: gpt-3.5-turbo
+    
+  anthropic:
+    enabled: false
+    api_key: ""
+    model: claude-3-sonnet
+    
+  # Smart home (future)
+  home_assistant:
+    enabled: false
+    url: ""
+    token: ""

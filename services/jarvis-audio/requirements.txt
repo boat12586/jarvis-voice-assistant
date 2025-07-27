@@ -1,0 +1,33 @@
+# Core FastAPI dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+python-multipart==0.0.6
+
+# Audio processing
+sounddevice==0.4.6
+soundfile==0.12.1
+numpy==1.24.3
+scipy==1.11.4
+
+# Speech recognition and synthesis
+openai-whisper==20231117
+torch==2.1.0
+torchaudio==2.1.0
+transformers==4.35.2
+edge-tts==6.1.10
+
+# WebSocket support
+websockets==12.0
+
+# Utilities
+python-dateutil==2.8.2
+python-dotenv==1.0.0
+redis==5.0.1
+aiofiles==23.2.0
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+flake8==6.1.0

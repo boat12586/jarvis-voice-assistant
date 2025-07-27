@@ -1,0 +1,314 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jarvis-ingress
+  namespace: jarvis-v2
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/websocket-services: "jarvis-core,jarvis-audio"
+    nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - jarvis.yourdomain.com
+    - api.jarvis.yourdomain.com
+    - audio.jarvis.yourdomain.com
+    - mobile.jarvis.yourdomain.com
+    secretName: jarvis-tls-secret
+  rules:
+  # Main web interface
+  - host: jarvis.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jarvis-web
+            port:
+              number: 3000
+      - path: /api/v2/
+        pathType: Prefix
+        backend:
+          service:
+            name: jarvis-core
+            port:
+              number: 8000
+      - path: /ws/
+        pathType: Prefix
+        backend:
+          service:
+            name: jarvis-core
+            port:
+              number: 8000
+  
+  # API subdomain
+  - host: api.jarvis.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jarvis-core
+            port:
+              number: 8000
+      - path: /ws/
+        pathType: Prefix
+        backend:
+          service:
+            name: jarvis-core
+            port:
+              number: 8000
+  
+  # Audio service subdomain
+  - host: audio.jarvis.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jarvis-audio
+            port:
+              number: 8001
+      - path: /ws/
+        pathType: Prefix
+        backend:
+          service:
+            name: jarvis-audio
+            port:
+              number: 8001
+  
+  # Mobile API subdomain
+  - host: mobile.jarvis.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: jarvis-mobile
+            port:
+              number: 8002
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jarvis-monitoring-ingress
+  namespace: jarvis-v2-monitoring
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: monitoring-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Authentication Required - Jarvis Monitoring"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - monitoring.jarvis.yourdomain.com
+    - grafana.jarvis.yourdomain.com
+    - prometheus.jarvis.yourdomain.com
+    secretName: jarvis-monitoring-tls-secret
+  rules:
+  # Monitoring dashboard
+  - host: monitoring.jarvis.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+  
+  # Grafana
+  - host: grafana.jarvis.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+  
+  # Prometheus
+  - host: prometheus.jarvis.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-default-deny
+  namespace: jarvis-v2
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-core-policy
+  namespace: jarvis-v2
+spec:
+  podSelector:
+    matchLabels:
+      app: jarvis-core
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: jarvis-nginx
+    - podSelector:
+        matchLabels:
+          app: jarvis-web
+    - podSelector:
+        matchLabels:
+          app: jarvis-mobile
+    ports:
+    - protocol: TCP
+      port: 8000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: jarvis-redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: jarvis-mongodb
+    ports:
+    - protocol: TCP
+      port: 27017
+  - to: {}
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-audio-policy
+  namespace: jarvis-v2
+spec:
+  podSelector:
+    matchLabels:
+      app: jarvis-audio
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: jarvis-nginx
+    - podSelector:
+        matchLabels:
+          app: jarvis-core
+    - podSelector:
+        matchLabels:
+          app: jarvis-mobile
+    ports:
+    - protocol: TCP
+      port: 8001
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: jarvis-core
+    ports:
+    - protocol: TCP
+      port: 8000
+  - to: {}
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-mobile-policy
+  namespace: jarvis-v2
+spec:
+  podSelector:
+    matchLabels:
+      app: jarvis-mobile
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: jarvis-nginx
+    ports:
+    - protocol: TCP
+      port: 8002
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: jarvis-core
+    ports:
+    - protocol: TCP
+      port: 8000
+  - to:
+    - podSelector:
+        matchLabels:
+          app: jarvis-audio
+    ports:
+    - protocol: TCP
+      port: 8001
+  - to: {}
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80

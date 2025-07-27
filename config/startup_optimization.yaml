@@ -1,0 +1,17 @@
+background_loading:
+  enabled: true
+  models:
+  - embedding
+  - llm
+  show_progress: true
+lazy_loading:
+  components:
+  - ai
+  - voice
+  - tts
+  delay_seconds: 2
+  enabled: true
+memory_optimization:
+  auto_cleanup: true
+  cleanup_interval: 300
+  memory_threshold: 0.8

@@ -1,0 +1,383 @@
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: jarvis-restricted-psp
+  namespace: jarvis-v2
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  fsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1
+        max: 65535
+  readOnlyRootFilesystem: false
+  hostNetwork: false
+  hostPID: false
+  hostIPC: false
+  hostPorts:
+    - min: 0
+      max: 65535
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jarvis-restricted-psp-user
+rules:
+- apiGroups: ['policy']
+  resources: ['podsecuritypolicies']
+  verbs: ['use']
+  resourceNames:
+  - jarvis-restricted-psp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: jarvis-restricted-psp-user-binding
+roleRef:
+  kind: ClusterRole
+  name: jarvis-restricted-psp-user
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: jarvis-core-service-account
+  namespace: jarvis-v2
+- kind: ServiceAccount
+  name: jarvis-user-service-account
+  namespace: jarvis-v2
+- kind: ServiceAccount
+  name: jarvis-readonly-service-account
+  namespace: jarvis-v2
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-egress-restriction
+  namespace: jarvis-v2
+spec:
+  podSelector:
+    matchLabels:
+      app: jarvis-core
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: jarvis-redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: jarvis-mongodb
+    ports:
+    - protocol: TCP
+      port: 27017
+  - to:
+    - podSelector:
+        matchLabels:
+          app: jarvis-audio
+    ports:
+    - protocol: TCP
+      port: 8001
+  - to: {}
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-ingress-restriction
+  namespace: jarvis-v2
+spec:
+  podSelector:
+    matchLabels:
+      app: jarvis-redis
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: jarvis-core
+    - podSelector:
+        matchLabels:
+          app: jarvis-celery-worker
+    - podSelector:
+        matchLabels:
+          app: jarvis-celery-audio-worker
+    - podSelector:
+        matchLabels:
+          app: jarvis-celery-beat
+    ports:
+    - protocol: TCP
+      port: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-mongodb-ingress-restriction
+  namespace: jarvis-v2
+spec:
+  podSelector:
+    matchLabels:
+      app: jarvis-mongodb
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: jarvis-core
+    - podSelector:
+        matchLabels:
+          app: jarvis-celery-worker
+    - podSelector:
+        matchLabels:
+          app: jarvis-celery-audio-worker
+    - podSelector:
+        matchLabels:
+          app: jarvis-mobile
+    ports:
+    - protocol: TCP
+      port: 27017
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-deny-all-default
+  namespace: jarvis-v2
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-web-ingress-policy
+  namespace: jarvis-v2
+spec:
+  podSelector:
+    matchLabels:
+      app: jarvis-web
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app: jarvis-nginx
+    ports:
+    - protocol: TCP
+      port: 3000
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: jarvis-limit-range
+  namespace: jarvis-v2
+spec:
+  limits:
+  - type: Container
+    default:
+      memory: "512Mi"
+      cpu: "500m"
+    defaultRequest:
+      memory: "128Mi"
+      cpu: "100m"
+    max:
+      memory: "2Gi"
+      cpu: "1000m"
+    min:
+      memory: "64Mi"
+      cpu: "50m"
+  - type: Pod
+    max:
+      memory: "4Gi"
+      cpu: "2000m"
+    min:
+      memory: "64Mi"
+      cpu: "50m"
+  - type: PersistentVolumeClaim
+    max:
+      storage: "200Gi"
+    min:
+      storage: "1Gi"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: jarvis-resource-quota
+  namespace: jarvis-v2
+spec:
+  hard:
+    requests.cpu: "10"
+    requests.memory: "20Gi"
+    limits.cpu: "20"
+    limits.memory: "40Gi"
+    persistentvolumeclaims: "20"
+    pods: "50"
+    services: "20"
+    secrets: "50"
+    configmaps: "50"
+    services.loadbalancers: "5"
+    services.nodeports: "10"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-monitoring-policy
+  namespace: jarvis-v2-monitoring
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app: prometheus
+    - podSelector:
+        matchLabels:
+          app: grafana
+    ports:
+    - protocol: TCP
+      port: 3000
+    - protocol: TCP
+      port: 9090
+    - protocol: TCP
+      port: 9093
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: jarvis-v2
+    ports:
+    - protocol: TCP
+      port: 9540
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 8082
+  - to: {}
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: monitoring-basic-auth
+  namespace: jarvis-v2-monitoring
+type: Opaque
+data:
+  auth: YWRtaW46JGFwcjEkSDY1L2lhSjIkQS5CZGJRd3JmS1B0NmtMSkRzYzB2LgoK  # admin:jarvis-monitor-2024
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionWebhook
+metadata:
+  name: jarvis-security-webhook
+webhooks:
+- name: jarvis-security-validation.jarvis.local
+  clientConfig:
+    service:
+      name: jarvis-security-webhook
+      namespace: jarvis-v2
+      path: "/validate"
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods", "services", "configmaps", "secrets"]
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["apps"]
+    apiVersions: ["v1"]
+    resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["extensions", "networking.k8s.io"]
+    apiVersions: ["v1", "v1beta1"]
+    resources: ["ingresses"]
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
+  failurePolicy: Fail
+  namespaceSelector:
+    matchLabels:
+      name: jarvis-v2
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-staging-isolation
+  namespace: jarvis-v2-staging
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: jarvis-v2-staging
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: jarvis-v2-staging
+  - to: {}
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53

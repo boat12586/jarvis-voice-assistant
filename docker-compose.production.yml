@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  jarvis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jarvis-assistant
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      - JARVIS_ENVIRONMENT=production
+      - JARVIS_LOG_LEVEL=INFO
+      - JARVIS_DATA_DIR=/app/data
+      - JARVIS_CONFIG_PATH=/app/config/production_config.yaml
+      
+    # Volumes for data persistence
+    volumes:
+      - jarvis_data:/app/data
+      - jarvis_logs:/app/logs
+      - jarvis_models:/app/models
+      - ./config:/app/config:ro
+      
+    # Audio device access (for voice features)
+    devices:
+      - /dev/snd:/dev/snd
+      
+    # Network
+    ports:
+      - "8080:8080"  # Web interface port
+      
+    # Security
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4.0'
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Optional: Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: jarvis-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+
+  # Optional: Log aggregation
+  fluentd:
+    image: fluent/fluentd:v1.16-debian-1
+    container_name: jarvis-fluentd
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/fluentd.conf:/fluentd/etc/fluent.conf:ro
+      - jarvis_logs:/var/log/jarvis:ro
+
+volumes:
+  jarvis_data:
+    driver: local
+  jarvis_logs:
+    driver: local
+  jarvis_models:
+    driver: local
+  prometheus_data:
+    driver: local
+
+networks:
+  default:
+    name: jarvis-network

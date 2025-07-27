@@ -1,0 +1,5 @@
+Collecting av
+  Using cached av-15.0.0-cp310-cp310-manylinux_2_28_x86_64.whl.metadata (4.6 kB)
+Using cached av-15.0.0-cp310-cp310-manylinux_2_28_x86_64.whl (39.2 MB)
+Installing collected packages: av
+Successfully installed av-15.0.0

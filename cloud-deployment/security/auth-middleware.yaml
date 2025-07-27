@@ -1,0 +1,577 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jarvis-auth-middleware
+  namespace: jarvis-v2
+  labels:
+    app: jarvis-auth-middleware
+    version: "2.0"
+    component: auth
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: jarvis-auth-middleware
+  template:
+    metadata:
+      labels:
+        app: jarvis-auth-middleware
+        version: "2.0"
+        component: auth
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - jarvis-auth-middleware
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: auth-middleware
+        image: jarvis/auth-middleware:2.0.0
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8081
+          name: grpc
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: PORT
+          value: "8080"
+        - name: GRPC_PORT
+          value: "8081"
+        - name: METRICS_PORT
+          value: "9090"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: jarvis-secrets
+              key: jwt-secret
+        - name: JWT_ALGORITHM
+          value: "HS256"
+        - name: JWT_EXPIRATION
+          value: "3600"
+        - name: JWT_REFRESH_EXPIRATION
+          value: "86400"
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: REDIS_URL
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: jarvis-secrets
+              key: redis-password
+        - name: MONGODB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: MONGODB_URL
+        - name: MONGODB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: jarvis-secrets
+              key: mongodb-password
+        - name: RATE_LIMIT_WINDOW
+          value: "900"  # 15 minutes
+        - name: RATE_LIMIT_MAX_REQUESTS
+          value: "100"
+        - name: RATE_LIMIT_BURST
+          value: "10"
+        - name: SESSION_TIMEOUT
+          value: "3600"  # 1 hour
+        - name: MAX_SESSIONS_PER_USER
+          value: "5"
+        - name: BRUTE_FORCE_PROTECTION_ENABLED
+          value: "true"
+        - name: BRUTE_FORCE_MAX_ATTEMPTS
+          value: "5"
+        - name: BRUTE_FORCE_WINDOW
+          value: "900"  # 15 minutes
+        - name: BRUTE_FORCE_LOCKOUT_DURATION
+          value: "3600"  # 1 hour
+        - name: OAUTH_GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: oauth2-proxy-secrets
+              key: client-id
+        - name: OAUTH_GOOGLE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: oauth2-proxy-secrets
+              key: client-secret
+        - name: OAUTH_GOOGLE_REDIRECT_URL
+          value: "https://auth.jarvis.yourdomain.com/oauth2/callback"
+        - name: CORS_ALLOWED_ORIGINS
+          value: "https://jarvis.yourdomain.com,https://api.jarvis.yourdomain.com,https://mobile.jarvis.yourdomain.com"
+        - name: CORS_ALLOWED_METHODS
+          value: "GET,POST,PUT,DELETE,OPTIONS,PATCH"
+        - name: CORS_ALLOWED_HEADERS
+          value: "Authorization,Content-Type,X-Requested-With,X-Auth-Token,X-User-ID,X-Session-ID"
+        - name: CORS_EXPOSE_HEADERS
+          value: "X-Total-Count,X-Rate-Limit-Remaining,X-Rate-Limit-Reset"
+        - name: CORS_MAX_AGE
+          value: "86400"
+        - name: SECURITY_HEADERS_ENABLED
+          value: "true"
+        - name: HSTS_MAX_AGE
+          value: "31536000"
+        - name: CSP_POLICY
+          value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:; frame-ancestors 'none'"
+        - name: AUDIT_LOG_ENABLED
+          value: "true"
+        - name: AUDIT_LOG_LEVEL
+          value: "INFO"
+        - name: AUDIT_LOG_EVENTS
+          value: "login,logout,password_change,permission_change,admin_action,failed_login,token_refresh"
+        - name: METRICS_ENABLED
+          value: "true"
+        - name: TRACING_ENABLED
+          value: "true"
+        - name: TRACING_ENDPOINT
+          value: "http://jaeger-collector:14268/api/traces"
+        - name: HEALTH_CHECK_ENABLED
+          value: "true"
+        - name: HEALTH_CHECK_INTERVAL
+          value: "30"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "300m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+        volumeMounts:
+        - name: temp-storage
+          mountPath: /tmp
+        - name: audit-logs
+          mountPath: /var/log/audit
+        - name: tls-certs
+          mountPath: /etc/ssl/certs
+          readOnly: true
+      volumes:
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "100Mi"
+      - name: audit-logs
+        persistentVolumeClaim:
+          claimName: jarvis-logs
+      - name: tls-certs
+        secret:
+          secretName: jarvis-internal-service-certs
+      serviceAccountName: jarvis-auth-service-account
+      nodeSelector:
+        node-type: compute
+      tolerations:
+      - key: "node-type"
+        operator: "Equal"
+        value: "compute"
+        effect: "NoSchedule"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jarvis-auth-middleware
+  namespace: jarvis-v2
+  labels:
+    app: jarvis-auth-middleware
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  - port: 8081
+    targetPort: 8081
+    protocol: TCP
+    name: grpc
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: metrics
+  selector:
+    app: jarvis-auth-middleware
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jarvis-auth-service-account
+  namespace: jarvis-v2
+  annotations:
+    iam.gke.io/gcp-service-account: jarvis-auth-sa@your-project-id.iam.gserviceaccount.com
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jarvis-auth-role
+  namespace: jarvis-v2
+rules:
+- apiGroups: [""]
+  resources: ["secrets", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jarvis-auth-role-binding
+  namespace: jarvis-v2
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: jarvis-auth-role
+subjects:
+- kind: ServiceAccount
+  name: jarvis-auth-service-account
+  namespace: jarvis-v2
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: jarvis-auth-middleware-hpa
+  namespace: jarvis-v2
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: jarvis-auth-middleware
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 30
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: jarvis-auth-middleware-policy
+  namespace: jarvis-v2
+spec:
+  podSelector:
+    matchLabels:
+      app: jarvis-auth-middleware
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: jarvis-core
+    - podSelector:
+        matchLabels:
+          app: jarvis-web
+    - podSelector:
+        matchLabels:
+          app: jarvis-mobile
+    - podSelector:
+        matchLabels:
+          app: jarvis-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: jarvis-redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - podSelector:
+        matchLabels:
+          app: jarvis-mongodb
+    ports:
+    - protocol: TCP
+      port: 27017
+  - to: {}
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jarvis-auth-config
+  namespace: jarvis-v2
+data:
+  auth-config.yaml: |
+    server:
+      port: 8080
+      grpc_port: 8081
+      metrics_port: 9090
+      read_timeout: 30s
+      write_timeout: 30s
+      idle_timeout: 60s
+      max_header_size: 8192
+      
+    jwt:
+      algorithm: HS256
+      expiration: 3600
+      refresh_expiration: 86400
+      issuer: "jarvis-v2-auth"
+      audience: "jarvis-v2-users"
+      
+    rate_limiting:
+      window: 900  # 15 minutes
+      max_requests: 100
+      burst: 10
+      
+    session:
+      timeout: 3600
+      max_sessions_per_user: 5
+      cleanup_interval: 300
+      
+    brute_force_protection:
+      enabled: true
+      max_attempts: 5
+      window: 900  # 15 minutes
+      lockout_duration: 3600  # 1 hour
+      
+    oauth:
+      google:
+        scopes: ["openid", "email", "profile"]
+        redirect_url: "https://auth.jarvis.yourdomain.com/oauth2/callback"
+        
+    cors:
+      allowed_origins:
+        - "https://jarvis.yourdomain.com"
+        - "https://api.jarvis.yourdomain.com"
+        - "https://mobile.jarvis.yourdomain.com"
+      allowed_methods:
+        - "GET"
+        - "POST"
+        - "PUT"
+        - "DELETE"
+        - "OPTIONS"
+        - "PATCH"
+      allowed_headers:
+        - "Authorization"
+        - "Content-Type"
+        - "X-Requested-With"
+        - "X-Auth-Token"
+        - "X-User-ID"
+        - "X-Session-ID"
+      expose_headers:
+        - "X-Total-Count"
+        - "X-Rate-Limit-Remaining"
+        - "X-Rate-Limit-Reset"
+      max_age: 86400
+      
+    security:
+      headers:
+        enabled: true
+        hsts_max_age: 31536000
+        csp_policy: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' wss: https:; frame-ancestors 'none'"
+        
+    audit:
+      enabled: true
+      level: "INFO"
+      events:
+        - "login"
+        - "logout"
+        - "password_change"
+        - "permission_change"
+        - "admin_action"
+        - "failed_login"
+        - "token_refresh"
+        
+    metrics:
+      enabled: true
+      
+    tracing:
+      enabled: true
+      endpoint: "http://jaeger-collector:14268/api/traces"
+      
+    health_check:
+      enabled: true
+      interval: 30
+      
+    logging:
+      level: "INFO"
+      format: "json"
+      
+    database:
+      connection_pool_size: 10
+      max_idle_connections: 5
+      connection_timeout: 30s
+      query_timeout: 30s
+      
+    redis:
+      connection_pool_size: 10
+      max_idle_connections: 5
+      connection_timeout: 5s
+      read_timeout: 3s
+      write_timeout: 3s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: jarvis-auth-middleware-metrics
+  namespace: jarvis-v2
+  labels:
+    app: jarvis-auth-middleware
+spec:
+  selector:
+    matchLabels:
+      app: jarvis-auth-middleware
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: jarvis-auth-virtual-service
+  namespace: jarvis-v2
+spec:
+  hosts:
+  - auth.jarvis.yourdomain.com
+  gateways:
+  - jarvis-gateway
+  http:
+  - match:
+    - uri:
+        prefix: /auth/
+    route:
+    - destination:
+        host: jarvis-auth-middleware
+        port:
+          number: 8080
+    timeout: 30s
+    retries:
+      attempts: 3
+      perTryTimeout: 10s
+      retryOn: gateway-error,connect-failure,refused-stream
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: oauth2-proxy
+        port:
+          number: 4180
+    timeout: 30s
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: jarvis-auth-destination-rule
+  namespace: jarvis-v2
+spec:
+  host: jarvis-auth-middleware
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+        tcpKeepalive:
+          time: 7200s
+          interval: 60s
+      http:
+        http1MaxPendingRequests: 64
+        http2MaxRequests: 100
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        consecutiveGatewayErrors: 3
+        interval: 30s
+        baseEjectionTime: 30s
+        maxEjectionPercent: 50
+        minHealthPercent: 50
+    loadBalancer:
+      simple: LEAST_CONN
+    outlierDetection:
+      consecutiveGatewayErrors: 3
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 50

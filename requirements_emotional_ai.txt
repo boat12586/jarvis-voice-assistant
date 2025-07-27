@@ -1,0 +1,44 @@
+# JARVIS Emotional AI System Dependencies
+# Additional requirements for emotional intelligence features
+
+# Core emotional AI dependencies
+transformers>=4.20.0
+torch>=1.11.0
+sentence-transformers>=2.2.0
+textblob>=0.17.1
+
+# Audio processing for voice emotion detection (optional)
+librosa>=0.9.0
+soundfile>=0.10.0
+scipy>=1.9.0
+
+# Data processing and analysis
+numpy>=1.21.0
+pandas>=1.4.0
+scikit-learn>=1.1.0
+
+# Natural language processing
+nltk>=3.7
+
+# Thai language support
+pythainlp>=3.0.0
+thai-segmenter>=0.4.0
+
+# Visualization for emotional analytics (optional)
+matplotlib>=3.5.0
+seaborn>=0.11.0
+
+# Additional utilities
+python-dateutil>=2.8.0
+pytz>=2022.1
+
+# Development and testing
+pytest>=7.0.0
+pytest-asyncio>=0.18.0
+
+# Web framework enhancements
+flask-cors>=3.0.10
+
+# Database for preference storage (optional upgrades)
+sqlalchemy>=1.4.0
+alembic>=1.8.0

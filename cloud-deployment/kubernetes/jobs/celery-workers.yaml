@@ -1,0 +1,436 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jarvis-celery-worker
+  namespace: jarvis-v2
+  labels:
+    app: jarvis-celery-worker
+    version: "2.0"
+    component: worker
+spec:
+  replicas: 4
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: jarvis-celery-worker
+  template:
+    metadata:
+      labels:
+        app: jarvis-celery-worker
+        version: "2.0"
+        component: worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9540"
+        prometheus.io/path: "/metrics"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - jarvis-celery-worker
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: celery-worker
+        image: jarvis/worker:2.0.0
+        command:
+        - celery
+        - -A
+        - jarvis_tasks
+        - worker
+        - --loglevel=info
+        - --concurrency=4
+        - --max-tasks-per-child=1000
+        - --time-limit=300
+        - --soft-time-limit=240
+        env:
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: CELERY_BROKER_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: CELERY_RESULT_BACKEND
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: jarvis-secrets
+              key: redis-password
+        - name: MONGODB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: MONGODB_URL
+        - name: OPENWEATHER_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: jarvis-secrets
+              key: openweather-api-key
+        - name: WORKER_TYPE
+          value: "general"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - jarvis_tasks
+            - inspect
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - jarvis_tasks
+            - inspect
+            - ping
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: temp-storage
+          mountPath: /tmp
+      - name: celery-exporter
+        image: danihodovic/celery-exporter:latest
+        ports:
+        - containerPort: 9540
+          name: metrics
+        env:
+        - name: CELERY_EXPORTER_BROKER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: CELERY_BROKER_URL
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "10m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+      volumes:
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "1Gi"
+      nodeSelector:
+        node-type: compute
+      tolerations:
+      - key: "node-type"
+        operator: "Equal"
+        value: "compute"
+        effect: "NoSchedule"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jarvis-celery-audio-worker
+  namespace: jarvis-v2
+  labels:
+    app: jarvis-celery-audio-worker
+    version: "2.0"
+    component: audio-worker
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: jarvis-celery-audio-worker
+  template:
+    metadata:
+      labels:
+        app: jarvis-celery-audio-worker
+        version: "2.0"
+        component: audio-worker
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - jarvis-celery-audio-worker
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: celery-audio-worker
+        image: jarvis/audio-worker:2.0.0
+        command:
+        - celery
+        - -A
+        - jarvis_tasks
+        - worker
+        - --loglevel=info
+        - --concurrency=2
+        - --max-tasks-per-child=100
+        - --time-limit=600
+        - --soft-time-limit=540
+        - --queues=audio,tts,stt
+        env:
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: CELERY_BROKER_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: CELERY_RESULT_BACKEND
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: jarvis-secrets
+              key: redis-password
+        - name: WORKER_TYPE
+          value: "audio"
+        - name: AUDIO_SAMPLE_RATE
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: AUDIO_SAMPLE_RATE
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - jarvis_tasks
+            - inspect
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - jarvis_tasks
+            - inspect
+            - ping
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: audio-models
+          mountPath: /app/models
+        - name: temp-storage
+          mountPath: /tmp
+      volumes:
+      - name: audio-models
+        persistentVolumeClaim:
+          claimName: jarvis-audio-models
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "2Gi"
+      nodeSelector:
+        node-type: compute-intensive
+      tolerations:
+      - key: "node-type"
+        operator: "Equal"
+        value: "compute-intensive"
+        effect: "NoSchedule"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jarvis-celery-beat
+  namespace: jarvis-v2
+  labels:
+    app: jarvis-celery-beat
+    version: "2.0"
+    component: scheduler
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: jarvis-celery-beat
+  template:
+    metadata:
+      labels:
+        app: jarvis-celery-beat
+        version: "2.0"
+        component: scheduler
+    spec:
+      containers:
+      - name: celery-beat
+        image: jarvis/worker:2.0.0
+        command:
+        - celery
+        - -A
+        - jarvis_tasks
+        - beat
+        - --loglevel=info
+        - --schedule=/tmp/celerybeat-schedule
+        - --pidfile=/tmp/celerybeat.pid
+        env:
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: CELERY_BROKER_URL
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: CELERY_RESULT_BACKEND
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: jarvis-secrets
+              key: redis-password
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "100m"
+        livenessProbe:
+          exec:
+            command:
+            - pgrep
+            - -f
+            - celery.*beat
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: beat-storage
+          mountPath: /tmp
+      volumes:
+      - name: beat-storage
+        emptyDir: {}
+      nodeSelector:
+        node-type: compute
+      tolerations:
+      - key: "node-type"
+        operator: "Equal"
+        value: "compute"
+        effect: "NoSchedule"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: jarvis-celery-worker-hpa
+  namespace: jarvis-v2
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: jarvis-celery-worker
+  minReplicas: 2
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: jarvis-celery-audio-worker-hpa
+  namespace: jarvis-v2
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: jarvis-celery-audio-worker
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 85
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 90
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 90
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30

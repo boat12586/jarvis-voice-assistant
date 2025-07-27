@@ -1,0 +1,16 @@
+{
+  "supabase_url": "https://your-project-id.supabase.co",
+  "supabase_key": "your-anon-key-here",
+  "supabase_service_key": "your-service-key-here",
+  "database_url": "postgresql://postgres:[password]@db.[project].supabase.co:5432/postgres",
+  "embedding_model": "mixedbread-ai/mxbai-embed-large-v1",
+  "chunk_size": 512,
+  "chunk_overlap": 50,
+  "top_k": 5,
+  "similarity_threshold": 0.7,
+  "max_documents": 10000,
+  "enable_logging": true,
+  "log_queries": true,
+  "auto_cleanup": true,
+  "cleanup_interval": 3600
+}

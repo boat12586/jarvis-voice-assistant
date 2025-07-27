@@ -1,0 +1,38 @@
+# JARVIS Voice Assistant - Minimal Working Requirements
+# สำหรับการติดตั้งและทดสอบ JARVIS ขั้นพื้นฐาน
+
+# GUI Framework
+PyQt6>=6.6.0
+PyQt6-Qt6>=6.6.0
+
+# AI และ ML Core
+torch>=2.1.0,<2.8.0
+transformers>=4.35.0,<5.0.0
+accelerate>=0.24.0
+sentence-transformers>=2.2.2
+numpy>=1.22.0,<2.0.0
+
+# Voice Processing
+faster-whisper>=0.10.0
+TTS>=0.21.0,<0.23.0
+sounddevice>=0.4.6
+pydub>=0.25.1
+librosa>=0.10.1
+scipy>=1.11.0
+
+# Web และ HTTP
+requests>=2.31.0
+flask>=3.0.0
+websockets>=12.0
+
+# Utilities
+PyYAML>=6.0.1
+python-dotenv>=1.0.0
+Pillow>=10.1.0
+psutil>=5.9.0
+
+# Configuration Management
+pydantic>=2.0.0,<3.0.0
+
+# Development
+pytest>=7.4.0

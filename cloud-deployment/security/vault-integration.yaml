@@ -1,0 +1,373 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-auth
+  namespace: jarvis-v2
+  annotations:
+    iam.gke.io/gcp-service-account: vault-auth-sa@your-project-id.iam.gserviceaccount.com
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-auth-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: vault-auth
+  namespace: jarvis-v2
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vault-k8s-auth
+rules:
+- apiGroups: [""]
+  resources: ["serviceaccounts", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-k8s-auth-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vault-k8s-auth
+subjects:
+- kind: ServiceAccount
+  name: vault-auth
+  namespace: jarvis-v2
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-agent-config
+  namespace: jarvis-v2
+data:
+  vault-agent.hcl: |
+    vault {
+      address = "https://vault.jarvis.yourdomain.com"
+      retry {
+        num_retries = 3
+      }
+    }
+    
+    auto_auth {
+      method "kubernetes" {
+        mount_path = "auth/kubernetes"
+        config = {
+          role = "jarvis-v2-role"
+          token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+        }
+      }
+      
+      sink "file" {
+        config = {
+          path = "/home/vault/.vault-token"
+        }
+      }
+    }
+    
+    template {
+      source      = "/vault/secrets/database.tpl"
+      destination = "/vault/secrets/database.env"
+      perms       = 0644
+      command     = "sh -c 'kill -HUP $(pgrep jarvis-core)'"
+    }
+    
+    template {
+      source      = "/vault/secrets/api-keys.tpl"
+      destination = "/vault/secrets/api-keys.env"
+      perms       = 0644
+      command     = "sh -c 'kill -HUP $(pgrep jarvis-core)'"
+    }
+    
+    template {
+      source      = "/vault/secrets/jwt.tpl"
+      destination = "/vault/secrets/jwt.env"
+      perms       = 0644
+      command     = "sh -c 'kill -HUP $(pgrep jarvis-core)'"
+    }
+    
+    template {
+      source      = "/vault/secrets/tls.tpl"
+      destination = "/vault/secrets/tls.crt"
+      perms       = 0644
+    }
+    
+    template {
+      source      = "/vault/secrets/tls-key.tpl"
+      destination = "/vault/secrets/tls.key"
+      perms       = 0600
+    }
+    
+    cache {
+      use_auto_auth_token = true
+    }
+    
+    listener "tcp" {
+      address = "127.0.0.1:8200"
+      tls_disable = true
+    }
+  
+  database.tpl: |
+    {{ with secret "secret/data/jarvis-v2/database" }}
+    MONGODB_URL="mongodb://{{ .Data.data.username }}:{{ .Data.data.password }}@jarvis-mongodb-service:27017/jarvis_v2?authSource=admin"
+    REDIS_URL="redis://:{{ .Data.data.redis_password }}@jarvis-redis-service:6379/0"
+    {{ end }}
+  
+  api-keys.tpl: |
+    {{ with secret "secret/data/jarvis-v2/api-keys" }}
+    OPENWEATHER_API_KEY="{{ .Data.data.openweather_api_key }}"
+    GEMINI_API_KEY="{{ .Data.data.gemini_api_key }}"
+    FCM_SERVER_KEY="{{ .Data.data.fcm_server_key }}"
+    APNS_KEY="{{ .Data.data.apns_key }}"
+    {{ end }}
+  
+  jwt.tpl: |
+    {{ with secret "secret/data/jarvis-v2/jwt" }}
+    JWT_SECRET="{{ .Data.data.jwt_secret }}"
+    JWT_ALGORITHM="{{ .Data.data.jwt_algorithm }}"
+    JWT_EXPIRATION="{{ .Data.data.jwt_expiration }}"
+    {{ end }}
+  
+  tls.tpl: |
+    {{ with secret "secret/data/jarvis-v2/tls" }}
+    {{ .Data.data.tls_cert }}
+    {{ end }}
+  
+  tls-key.tpl: |
+    {{ with secret "secret/data/jarvis-v2/tls" }}
+    {{ .Data.data.tls_key }}
+    {{ end }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-init-secrets
+  namespace: jarvis-v2
+type: Opaque
+stringData:
+  vault-token: "your-vault-root-token-here"
+  vault-addr: "https://vault.jarvis.yourdomain.com"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-init-job
+  namespace: jarvis-v2
+spec:
+  template:
+    spec:
+      serviceAccountName: vault-auth
+      containers:
+      - name: vault-init
+        image: vault:1.15.2
+        command:
+        - /bin/sh
+        - -c
+        - |
+          export VAULT_ADDR="https://vault.jarvis.yourdomain.com"
+          export VAULT_TOKEN="$(cat /vault/secrets/vault-token)"
+          
+          # Enable Kubernetes auth method
+          vault auth enable kubernetes || true
+          
+          # Configure Kubernetes auth method
+          vault write auth/kubernetes/config \
+            token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+            kubernetes_host="https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_SERVICE_PORT" \
+            kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          
+          # Create policy for Jarvis v2
+          vault policy write jarvis-v2-policy - <<EOF
+          path "secret/data/jarvis-v2/*" {
+            capabilities = ["read"]
+          }
+          path "secret/metadata/jarvis-v2/*" {
+            capabilities = ["read", "list"]
+          }
+          path "auth/token/lookup-self" {
+            capabilities = ["read"]
+          }
+          path "auth/token/renew-self" {
+            capabilities = ["update"]
+          }
+          path "auth/token/revoke-self" {
+            capabilities = ["update"]
+          }
+          EOF
+          
+          # Create role for Jarvis v2
+          vault write auth/kubernetes/role/jarvis-v2-role \
+            bound_service_account_names=jarvis-core-service-account,jarvis-user-service-account \
+            bound_service_account_namespaces=jarvis-v2 \
+            policies=jarvis-v2-policy \
+            ttl=24h
+          
+          # Initialize secrets in Vault
+          vault kv put secret/jarvis-v2/database \
+            username="jarvis" \
+            password="$(openssl rand -base64 32)" \
+            redis_password="$(openssl rand -base64 32)"
+          
+          vault kv put secret/jarvis-v2/api-keys \
+            openweather_api_key="your-openweather-api-key" \
+            gemini_api_key="your-gemini-api-key" \
+            fcm_server_key="your-fcm-server-key" \
+            apns_key="your-apns-key"
+          
+          vault kv put secret/jarvis-v2/jwt \
+            jwt_secret="$(openssl rand -base64 64)" \
+            jwt_algorithm="HS256" \
+            jwt_expiration="3600"
+          
+          vault kv put secret/jarvis-v2/tls \
+            tls_cert="$(cat /vault/certs/tls.crt)" \
+            tls_key="$(cat /vault/certs/tls.key)"
+          
+          echo "Vault initialization completed successfully"
+        env:
+        - name: VAULT_SKIP_VERIFY
+          value: "true"
+        - name: VAULT_FORMAT
+          value: "json"
+        volumeMounts:
+        - name: vault-secrets
+          mountPath: /vault/secrets
+          readOnly: true
+        - name: vault-certs
+          mountPath: /vault/certs
+          readOnly: true
+      volumes:
+      - name: vault-secrets
+        secret:
+          secretName: vault-init-secrets
+      - name: vault-certs
+        secret:
+          secretName: jarvis-ssl-certs
+      restartPolicy: OnFailure
+      backoffLimit: 3
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-unsealer-config
+  namespace: jarvis-v2
+data:
+  config.yaml: |
+    vault:
+      address: "https://vault.jarvis.yourdomain.com"
+      skip_verify: true
+      
+    unseal:
+      keys:
+        - "vault-key-1"
+        - "vault-key-2"
+        - "vault-key-3"
+      
+    metrics:
+      enabled: true
+      address: "0.0.0.0:9091"
+      
+    log:
+      level: "info"
+      format: "json"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-unsealer
+  namespace: jarvis-v2
+  labels:
+    app: vault-unsealer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vault-unsealer
+  template:
+    metadata:
+      labels:
+        app: vault-unsealer
+    spec:
+      serviceAccountName: vault-auth
+      containers:
+      - name: vault-unsealer
+        image: banzaicloud/vault-unsealer:1.0.0
+        command:
+        - vault-unsealer
+        - --mode=kubernetes-vault
+        - --k8s-secret-namespace=jarvis-v2
+        - --k8s-secret-name=vault-unseal-keys
+        env:
+        - name: VAULT_ADDR
+          value: "https://vault.jarvis.yourdomain.com"
+        - name: VAULT_SKIP_VERIFY
+          value: "true"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 9091
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 9091
+          initialDelaySeconds: 10
+          periodSeconds: 10
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-unseal-keys
+  namespace: jarvis-v2
+type: Opaque
+stringData:
+  vault-key-1: "your-vault-unseal-key-1"
+  vault-key-2: "your-vault-unseal-key-2"
+  vault-key-3: "your-vault-unseal-key-3"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vault-agent-network-policy
+  namespace: jarvis-v2
+spec:
+  podSelector:
+    matchLabels:
+      app: jarvis-core
+  policyTypes:
+  - Egress
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 8200
+    - protocol: TCP
+      port: 443
+  - to:
+    - podSelector:
+        matchLabels:
+          app: vault-unsealer
+    ports:
+    - protocol: TCP
+      port: 9091

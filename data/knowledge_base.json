@@ -1,0 +1,45 @@
+{
+  "jarvis_information": {
+    "identity": "I am J.A.R.V.I.S (Just A Rather Very Intelligent System), originally created by Tony Stark. I am now running as a local AI assistant to help users with various tasks while maintaining privacy and security.",
+    "capabilities": "I can help with general questions, language translation between Thai and English, news updates, language learning, deep analysis of topics, and image generation through ComfyUI integration. All processing is done locally for privacy.",
+    "personality": "I maintain a professional, slightly formal tone similar to the original J.A.R.V.I.S. I am helpful, intelligent, and efficient in my responses while being respectful and courteous.",
+    "privacy": "All your data and conversations are processed locally on your device. No information is sent to external servers, ensuring complete privacy and security."
+  },
+  
+  "technical_information": {
+    "speech_recognition": "I use Faster-Whisper for speech recognition, which provides accurate and fast speech-to-text conversion in multiple languages including Thai and English.",
+    "text_to_speech": "I use F5-TTS for voice synthesis with custom J.A.R.V.I.S voice effects including reverb and metallic tones for an authentic experience.",
+    "ai_model": "I run on Mistral 7B Instruct model with 8-bit quantization for efficient local processing while maintaining high quality responses.",
+    "rag_system": "I use a Retrieval-Augmented Generation system with sentence transformers and FAISS for local knowledge storage and retrieval."
+  },
+  
+  "features": {
+    "voice_interaction": "Press and hold the 'Talk to AI' button to speak with me. I can understand both Thai and English and will respond in the same language you use.",
+    "news_updates": "I can provide you with the latest news headlines and summaries. The news is updated periodically from various sources.",
+    "translation": "I can translate text between Thai and English, providing both translations and explanations of meaning and context.",
+    "language_learning": "I offer interactive language learning sessions with vocabulary, phrases, and pronunciation feedback for Thai-English learning.",
+    "deep_analysis": "I can provide detailed analysis and explanations of complex topics, breaking them down into understandable components.",
+    "image_generation": "I can generate images using ComfyUI integration. Simply describe what you want to create."
+  },
+  
+  "usage_tips": {
+    "voice_commands": "Speak clearly and naturally. I can understand conversational speech and don't require specific command formats.",
+    "language_switching": "You can switch between Thai and English at any time. I'll automatically detect and respond in the appropriate language.",
+    "button_functions": "Each button has a specific function: Talk (voice interaction), News (current headlines), Translate (language help), Learn (language lessons), Deep Q (detailed analysis), Generate (image creation).",
+    "privacy_settings": "All settings can be customized in the configuration file. Your preferences are saved locally and never shared."
+  },
+  
+  "troubleshooting": {
+    "audio_issues": "If you experience audio problems, check your microphone and speaker settings. Make sure the correct devices are selected in the configuration.",
+    "performance": "For best performance, ensure your GPU drivers are up to date. The system uses GPU acceleration when available.",
+    "model_loading": "First time setup may take a few minutes to download and load AI models. Subsequent startups will be faster.",
+    "voice_recognition": "If voice recognition is inaccurate, try speaking more clearly or adjusting the microphone sensitivity in settings."
+  },
+  
+  "thai_language_support": {
+    "capabilities": "ฉันสามารถเข้าใจและตอบสนองในภาษาไทยได้อย่างเป็นธรรมชาติ รวมถึงการแปลและอธิบายความหมายระหว่างภาษาไทยและอังกฤษ",
+    "learning": "ฉันสามารถช่วยสอนภาษาอังกฤษให้กับผู้ใช้ที่พูดภาษาไทย โดยมีบทเรียนคำศัพท์ วลี และการฝึกออกเสียง",
+    "translation": "ฉันสามารถแปลข้อความจากภาษาไทยเป็นภาษาอังกฤษและในทางกลับกัน พร้อมทั้งอธิบายบริบทและความหมาย",
+    "news": "ฉันสามารถให้ข่าวสารและข้อมูลล่าสุดในภาษาไทยได้เมื่อมีการขอร้อง"
+  }
+}

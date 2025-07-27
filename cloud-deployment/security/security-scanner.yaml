@@ -1,0 +1,666 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: falco
+  namespace: jarvis-v2-monitoring
+  labels:
+    app: falco
+    component: security-scanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: falco
+  template:
+    metadata:
+      labels:
+        app: falco
+        component: security-scanner
+    spec:
+      serviceAccountName: falco-service-account
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: falco
+        image: falcosecurity/falco:0.36.2
+        args:
+        - /usr/bin/falco
+        - --cri
+        - /host/run/containerd/containerd.sock
+        - --cri
+        - /host/run/crio/crio.sock
+        - -K
+        - /var/run/secrets/kubernetes.io/serviceaccount/token
+        - -k
+        - https://kubernetes.default
+        - --k8s-node-name
+        - $(FALCO_K8S_NODE_NAME)
+        - -v
+        env:
+        - name: FALCO_K8S_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: dev-fs
+          mountPath: /host/dev
+          readOnly: true
+        - name: proc-fs
+          mountPath: /host/proc
+          readOnly: true
+        - name: boot-fs
+          mountPath: /host/boot
+          readOnly: true
+        - name: lib-modules
+          mountPath: /host/lib/modules
+          readOnly: true
+        - name: usr-fs
+          mountPath: /host/usr
+          readOnly: true
+        - name: etc-fs
+          mountPath: /host/etc
+          readOnly: true
+        - name: var-run-docker
+          mountPath: /host/var/run/docker.sock
+          readOnly: true
+        - name: var-run-containerd
+          mountPath: /host/run/containerd/containerd.sock
+          readOnly: true
+        - name: var-run-crio
+          mountPath: /host/run/crio/crio.sock
+          readOnly: true
+        - name: falco-config
+          mountPath: /etc/falco
+          readOnly: true
+        - name: falco-rules
+          mountPath: /etc/falco/rules.d
+          readOnly: true
+      volumes:
+      - name: dev-fs
+        hostPath:
+          path: /dev
+      - name: proc-fs
+        hostPath:
+          path: /proc
+      - name: boot-fs
+        hostPath:
+          path: /boot
+      - name: lib-modules
+        hostPath:
+          path: /lib/modules
+      - name: usr-fs
+        hostPath:
+          path: /usr
+      - name: etc-fs
+        hostPath:
+          path: /etc
+      - name: var-run-docker
+        hostPath:
+          path: /var/run/docker.sock
+      - name: var-run-containerd
+        hostPath:
+          path: /run/containerd/containerd.sock
+      - name: var-run-crio
+        hostPath:
+          path: /run/crio/crio.sock
+      - name: falco-config
+        configMap:
+          name: falco-config
+      - name: falco-rules
+        configMap:
+          name: falco-rules
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+      - effect: NoSchedule
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: falco-service-account
+  namespace: jarvis-v2-monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: falco-cluster-role
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods", "services", "events", "namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["deployments", "replicasets", "daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: falco-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: falco-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: falco-service-account
+  namespace: jarvis-v2-monitoring
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-config
+  namespace: jarvis-v2-monitoring
+data:
+  falco.yaml: |
+    rules_file:
+      - /etc/falco/falco_rules.yaml
+      - /etc/falco/falco_rules.local.yaml
+      - /etc/falco/k8s_audit_rules.yaml
+      - /etc/falco/rules.d
+    
+    time_format_iso_8601: true
+    json_output: true
+    json_include_output_property: true
+    json_include_tags_property: true
+    
+    log_stderr: true
+    log_syslog: true
+    log_level: info
+    
+    priority: debug
+    
+    buffered_outputs: false
+    
+    syscall_event_drops:
+      threshold: 0.03
+      actions:
+        - log
+        - alert
+      rate: 0.03333
+      max_burst: 1000
+    
+    outputs:
+      rate: 1
+      max_burst: 1000
+    
+    syslog_output:
+      enabled: true
+    
+    file_output:
+      enabled: false
+    
+    stdout_output:
+      enabled: true
+    
+    webserver:
+      enabled: true
+      listen_port: 8765
+      k8s_healthz_endpoint: /healthz
+      ssl_enabled: false
+      ssl_certificate: /etc/falco/certs/server.pem
+      ssl_private_key: /etc/falco/certs/server-key.pem
+    
+    grpc:
+      enabled: false
+      bind_address: "0.0.0.0:5060"
+      threadiness: 8
+      private_key: /etc/falco/certs/server-key.pem
+      cert_chain: /etc/falco/certs/server.pem
+      root_certs: /etc/falco/certs/ca.pem
+    
+    grpc_output:
+      enabled: false
+  
+  falco_rules.local.yaml: |
+    # Jarvis-specific security rules
+    - rule: Jarvis Unauthorized Network Connection
+      desc: Detect unauthorized network connections from Jarvis containers
+      condition: >
+        inbound_outbound and
+        container.name startswith "jarvis-" and
+        not (fd.sockfamily = ip and (fd.ip = "10.0.0.0/8" or fd.ip = "127.0.0.1" or fd.ip = "172.16.0.0/12"))
+      output: >
+        Unauthorized network connection from Jarvis container 
+        (command=%proc.cmdline connection=%fd.name user=%user.name container=%container.name)
+      priority: WARNING
+      tags: [network, jarvis, unauthorized]
+    
+    - rule: Jarvis Privilege Escalation
+      desc: Detect privilege escalation attempts in Jarvis containers
+      condition: >
+        spawned_process and
+        container.name startswith "jarvis-" and
+        (proc.name in (su, sudo, usermod, chsh, chfn, passwd) or 
+         proc.cmdline contains "chmod +s" or
+         proc.cmdline contains "setuid" or
+         proc.cmdline contains "setgid")
+      output: >
+        Privilege escalation attempt in Jarvis container
+        (command=%proc.cmdline user=%user.name container=%container.name)
+      priority: HIGH
+      tags: [privilege_escalation, jarvis, security]
+    
+    - rule: Jarvis Sensitive File Access
+      desc: Detect access to sensitive files in Jarvis containers
+      condition: >
+        open_read and
+        container.name startswith "jarvis-" and
+        (fd.name in (/etc/passwd, /etc/shadow, /etc/group, /etc/gshadow, /etc/sudoers) or
+         fd.name startswith "/var/run/secrets/" or
+         fd.name contains "id_rsa" or
+         fd.name contains "id_dsa" or
+         fd.name contains ".pem" or
+         fd.name contains ".key")
+      output: >
+        Sensitive file access in Jarvis container
+        (file=%fd.name command=%proc.cmdline user=%user.name container=%container.name)
+      priority: HIGH
+      tags: [file_access, jarvis, sensitive]
+    
+    - rule: Jarvis Crypto Mining Activity
+      desc: Detect crypto mining activity in Jarvis containers
+      condition: >
+        spawned_process and
+        container.name startswith "jarvis-" and
+        (proc.name in (xmrig, minergate, cpuminer, cgminer, bfgminer) or
+         proc.cmdline contains "stratum+tcp" or
+         proc.cmdline contains "cryptonight" or
+         proc.cmdline contains "scrypt" or
+         proc.cmdline contains "sha256" or
+         proc.cmdline contains "pool.minergate.com")
+      output: >
+        Crypto mining activity detected in Jarvis container
+        (command=%proc.cmdline user=%user.name container=%container.name)
+      priority: CRITICAL
+      tags: [crypto_mining, jarvis, malware]
+    
+    - rule: Jarvis Container Escape Attempt
+      desc: Detect container escape attempts in Jarvis containers
+      condition: >
+        spawned_process and
+        container.name startswith "jarvis-" and
+        (proc.name in (nsenter, unshare, chroot, pivot_root) or
+         proc.cmdline contains "/proc/self/exe" or
+         proc.cmdline contains "runc" or
+         proc.cmdline contains "docker" or
+         proc.cmdline contains "kubectl")
+      output: >
+        Container escape attempt in Jarvis container
+        (command=%proc.cmdline user=%user.name container=%container.name)
+      priority: CRITICAL
+      tags: [container_escape, jarvis, security]
+    
+    - rule: Jarvis Malicious Binary Execution
+      desc: Detect execution of malicious binaries in Jarvis containers
+      condition: >
+        spawned_process and
+        container.name startswith "jarvis-" and
+        (proc.name in (nc, ncat, netcat, telnet, wget, curl, nmap, masscan, zmap) or
+         proc.cmdline contains "base64" or
+         proc.cmdline contains "python -c" or
+         proc.cmdline contains "perl -e" or
+         proc.cmdline contains "ruby -e" or
+         proc.cmdline contains "php -r" or
+         proc.cmdline contains "/dev/tcp/" or
+         proc.cmdline contains "/dev/udp/")
+      output: >
+        Malicious binary execution in Jarvis container
+        (command=%proc.cmdline user=%user.name container=%container.name)
+      priority: HIGH
+      tags: [malicious_binary, jarvis, security]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: falco-rules
+  namespace: jarvis-v2-monitoring
+data:
+  jarvis_custom_rules.yaml: |
+    # Custom Jarvis security rules
+    - rule: Jarvis API Anomaly Detection
+      desc: Detect anomalous API behavior in Jarvis services
+      condition: >
+        (k8s_audit and ka.verb in (create, update, patch, delete) and
+         ka.target.namespace startswith "jarvis-" and
+         ka.user.name not in (system:serviceaccount:jarvis-v2:jarvis-core-service-account,
+                               system:serviceaccount:jarvis-v2:jarvis-admin-service-account)) or
+        (inbound_outbound and
+         container.name startswith "jarvis-" and
+         fd.sport not in (80, 443, 8000, 8001, 8002, 6379, 27017) and
+         fd.dport not in (80, 443, 8000, 8001, 8002, 6379, 27017))
+      output: >
+        Anomalous API behavior in Jarvis service
+        (user=%ka.user.name verb=%ka.verb target=%ka.target.name container=%container.name)
+      priority: WARNING
+      tags: [api_anomaly, jarvis, monitoring]
+    
+    - rule: Jarvis Data Exfiltration
+      desc: Detect potential data exfiltration from Jarvis containers
+      condition: >
+        outbound and
+        container.name startswith "jarvis-" and
+        fd.bytes > 1000000 and
+        not (fd.ip startswith "10." or fd.ip startswith "172.16." or fd.ip startswith "192.168.")
+      output: >
+        Potential data exfiltration from Jarvis container
+        (bytes=%fd.bytes destination=%fd.rip:%fd.rport container=%container.name)
+      priority: HIGH
+      tags: [data_exfiltration, jarvis, security]
+    
+    - rule: Jarvis Redis Unauthorized Access
+      desc: Detect unauthorized access to Redis in Jarvis environment
+      condition: >
+        inbound_outbound and
+        fd.sport = 6379 and
+        container.name startswith "jarvis-redis" and
+        not (k8s.pod.name startswith "jarvis-core" or
+             k8s.pod.name startswith "jarvis-celery" or
+             k8s.pod.name startswith "jarvis-mobile")
+      output: >
+        Unauthorized Redis access in Jarvis environment
+        (source=%fd.rip:%fd.rport target=%fd.lip:%fd.lport container=%container.name)
+      priority: HIGH
+      tags: [redis_access, jarvis, database]
+    
+    - rule: Jarvis MongoDB Unauthorized Access
+      desc: Detect unauthorized access to MongoDB in Jarvis environment
+      condition: >
+        inbound_outbound and
+        fd.sport = 27017 and
+        container.name startswith "jarvis-mongodb" and
+        not (k8s.pod.name startswith "jarvis-core" or
+             k8s.pod.name startswith "jarvis-celery" or
+             k8s.pod.name startswith "jarvis-mobile")
+      output: >
+        Unauthorized MongoDB access in Jarvis environment
+        (source=%fd.rip:%fd.rport target=%fd.lip:%fd.lport container=%container.name)
+      priority: HIGH
+      tags: [mongodb_access, jarvis, database]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: falco-service
+  namespace: jarvis-v2-monitoring
+  labels:
+    app: falco
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8765
+    targetPort: 8765
+    name: http
+  - port: 5060
+    targetPort: 5060
+    name: grpc
+  selector:
+    app: falco
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trivy-operator
+  namespace: jarvis-v2-monitoring
+  labels:
+    app: trivy-operator
+    component: vulnerability-scanner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trivy-operator
+  template:
+    metadata:
+      labels:
+        app: trivy-operator
+        component: vulnerability-scanner
+    spec:
+      serviceAccountName: trivy-operator-service-account
+      containers:
+      - name: trivy-operator
+        image: aquasec/trivy-operator:0.18.0
+        command:
+        - trivy-operator
+        args:
+        - --scan-job-timeout=5m
+        - --concurrent-scan-jobs-limit=10
+        - --scan-job-retry-after=30s
+        - --batch-delete-limit=10
+        - --batch-delete-delay=10s
+        - --metrics-bind-address=:8080
+        - --health-probe-bind-address=:9090
+        - --log-dev-mode=false
+        - --leader-elect=false
+        env:
+        - name: OPERATOR_NAMESPACE
+          value: "jarvis-v2-monitoring"
+        - name: OPERATOR_TARGET_NAMESPACES
+          value: "jarvis-v2,jarvis-v2-staging"
+        - name: OPERATOR_EXCLUDE_NAMESPACES
+          value: "kube-system,kube-public,kube-node-lease"
+        - name: OPERATOR_TARGET_WORKLOADS
+          value: "deployment,replicaset,replicationcontroller,statefulset,daemonset,cronjob,job"
+        - name: OPERATOR_SERVICE_ACCOUNT
+          value: "trivy-operator-service-account"
+        - name: OPERATOR_LOG_DEV_MODE
+          value: "false"
+        - name: OPERATOR_SCAN_JOB_TIMEOUT
+          value: "5m"
+        - name: OPERATOR_CONCURRENT_SCAN_JOBS_LIMIT
+          value: "10"
+        - name: OPERATOR_SCAN_JOB_RETRY_AFTER
+          value: "30s"
+        - name: OPERATOR_BATCH_DELETE_LIMIT
+          value: "10"
+        - name: OPERATOR_BATCH_DELETE_DELAY
+          value: "10s"
+        - name: OPERATOR_METRICS_BIND_ADDRESS
+          value: ":8080"
+        - name: OPERATOR_HEALTH_PROBE_BIND_ADDRESS
+          value: ":9090"
+        - name: OPERATOR_VULNERABILITY_SCANNER_ENABLED
+          value: "true"
+        - name: OPERATOR_CONFIG_AUDIT_SCANNER_ENABLED
+          value: "true"
+        - name: OPERATOR_RBAC_ASSESSMENT_SCANNER_ENABLED
+          value: "true"
+        - name: OPERATOR_INFRA_ASSESSMENT_SCANNER_ENABLED
+          value: "true"
+        - name: OPERATOR_CLUSTER_COMPLIANCE_ENABLED
+          value: "true"
+        - name: TRIVY_SEVERITY
+          value: "UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL"
+        - name: TRIVY_IGNORE_UNFIXED
+          value: "false"
+        - name: TRIVY_OFFLINE_SCAN
+          value: "false"
+        - name: TRIVY_JAVA_DB_REPOSITORY
+          value: "ghcr.io/aquasecurity/trivy-java-db"
+        - name: TRIVY_SKIP_JAVA_DB_UPDATE
+          value: "false"
+        ports:
+        - containerPort: 8080
+          name: metrics
+        - containerPort: 9090
+          name: health
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 9090
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: trivy-operator-service-account
+  namespace: jarvis-v2-monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: trivy-operator-cluster-role
+rules:
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "replicationcontrollers", "services", "endpoints", "persistentvolumes", "persistentvolumeclaims", "limitranges", "resourcequotas", "nodes", "namespaces", "serviceaccounts", "configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies", "ingresses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["aquasecurity.github.io"]
+  resources: ["vulnerabilityreports", "configauditreports", "clusterconfigauditreports", "rbacassessmentreports", "infraassessmentreports", "clustercompliancereports"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: trivy-operator-cluster-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: trivy-operator-cluster-role
+subjects:
+- kind: ServiceAccount
+  name: trivy-operator-service-account
+  namespace: jarvis-v2-monitoring
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trivy-operator-service
+  namespace: jarvis-v2-monitoring
+  labels:
+    app: trivy-operator
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: metrics
+  - port: 9090
+    targetPort: 9090
+    name: health
+  selector:
+    app: trivy-operator
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: security-scan-report
+  namespace: jarvis-v2-monitoring
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: security-reporter
+            image: curlimages/curl:8.5.0
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Generate security report
+              echo "=== Daily Security Report $(date) ===" > /tmp/security-report.txt
+              
+              # Fetch Falco alerts
+              echo "=== Falco Security Alerts ===" >> /tmp/security-report.txt
+              kubectl logs -n jarvis-v2-monitoring -l app=falco --since=24h --tail=100 >> /tmp/security-report.txt 2>/dev/null || echo "No Falco alerts found"
+              
+              # Fetch vulnerability scan results
+              echo "=== Vulnerability Scan Results ===" >> /tmp/security-report.txt
+              kubectl get vulnerabilityreports -n jarvis-v2 -o json | jq -r '.items[] | select(.report.summary.criticalCount > 0 or .report.summary.highCount > 0) | "\(.metadata.name): Critical: \(.report.summary.criticalCount), High: \(.report.summary.highCount)"' >> /tmp/security-report.txt 2>/dev/null || echo "No critical vulnerabilities found"
+              
+              # Fetch config audit results
+              echo "=== Configuration Audit Results ===" >> /tmp/security-report.txt
+              kubectl get configauditreports -n jarvis-v2 -o json | jq -r '.items[] | select(.report.summary.criticalCount > 0 or .report.summary.highCount > 0) | "\(.metadata.name): Critical: \(.report.summary.criticalCount), High: \(.report.summary.highCount)"' >> /tmp/security-report.txt 2>/dev/null || echo "No critical configuration issues found"
+              
+              # Send to webhook (replace with your webhook URL)
+              curl -X POST -H "Content-Type: application/json" \
+                -d "{\"text\":\"$(cat /tmp/security-report.txt)\"}" \
+                "$WEBHOOK_URL" || echo "Failed to send report"
+              
+              echo "Security report generated and sent"
+            env:
+            - name: WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: security-webhook-config
+                  key: webhook-url
+                  optional: true
+          restartPolicy: OnFailure
+      backoffLimit: 3
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: security-webhook-config
+  namespace: jarvis-v2-monitoring
+type: Opaque
+stringData:
+  webhook-url: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"

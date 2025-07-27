@@ -1,0 +1,14 @@
+# JARVIS Voice Assistant - Ultra Minimal สำหรับการทดสอบเบื้องต้น
+# เฉพาะ packages ที่จำเป็นที่สุดสำหรับการรัน JARVIS ขั้นพื้นฐาน
+
+# GUI Framework
+PyQt6>=6.6.0
+
+# Configuration และ Utilities พื้นฐาน
+PyYAML>=6.0.1
+pydantic>=2.0.0,<3.0.0
+psutil>=5.9.0
+requests>=2.31.0
+
+# Development
+pytest>=7.4.0

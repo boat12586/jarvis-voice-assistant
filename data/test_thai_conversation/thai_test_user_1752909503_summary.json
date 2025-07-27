@@ -1,0 +1,30 @@
+{
+  "session_id": "thai_test_user_1752909503",
+  "duration_minutes": 0.014522190888722737,
+  "turn_count": 7,
+  "languages_used": [
+    "th"
+  ],
+  "avg_confidence": 0.9985714285714286,
+  "primary_intents": [
+    [
+      "action_request",
+      6
+    ],
+    [
+      "system_control",
+      1
+    ]
+  ],
+  "extracted_entities": {
+    "time": [
+      "วันนี้"
+    ]
+  },
+  "active_topics": [],
+  "conversation_tone": "polite",
+  "user_preferences": {
+    "politeness_level": "high",
+    "communication_style": "formal"
+  }
+}

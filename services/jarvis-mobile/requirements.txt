@@ -1,0 +1,46 @@
+# Core FastAPI dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+python-multipart==0.0.6
+
+# HTTP client for service communication
+httpx==0.25.2
+requests==2.31.0
+
+# Authentication and security
+python-jose[cryptography]==3.3.0
+PyJWT==2.8.0
+cryptography==41.0.7
+passlib[bcrypt]==1.7.4
+
+# Mobile push notifications
+pyfcm==1.5.4
+apns2==0.7.2
+
+# Database (optional for mobile-specific data)
+redis==5.0.1
+
+# Utilities
+python-dateutil==2.8.2
+python-dotenv==1.0.0
+pydantic-settings==2.1.0
+
+# Image processing (for mobile uploads)
+Pillow==10.1.0
+
+# Audio processing (for mobile audio)
+pydub==0.25.1
+
+# Background tasks
+celery==5.3.4
+kombu==5.3.4
+
+# Monitoring
+prometheus-client==0.19.0
+
+# Development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+flake8==6.1.0

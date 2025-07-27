@@ -1,0 +1,179 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jarvis-audio
+  namespace: jarvis-v2
+  labels:
+    app: jarvis-audio
+    version: "2.0"
+    component: audio
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: jarvis-audio
+  template:
+    metadata:
+      labels:
+        app: jarvis-audio
+        version: "2.0"
+        component: audio
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/api/v2/audio/metrics"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - jarvis-audio
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: jarvis-audio
+        image: jarvis/audio:2.0.0
+        ports:
+        - containerPort: 8001
+          name: http
+        env:
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: ENVIRONMENT
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: LOG_LEVEL
+        - name: CORE_SERVICE_URL
+          value: "http://jarvis-core:8000"
+        - name: AUDIO_SAMPLE_RATE
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: AUDIO_SAMPLE_RATE
+        - name: AUDIO_CHUNK_SIZE
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: AUDIO_CHUNK_SIZE
+        - name: WORKER_COUNT
+          value: "2"
+        - name: ENABLE_REAL_TIME_AUDIO
+          valueFrom:
+            configMapKeyRef:
+              name: jarvis-config
+              key: ENABLE_REAL_TIME_AUDIO
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/v2/audio/health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/v2/audio/health
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: audio-models
+          mountPath: /app/models
+        - name: temp-storage
+          mountPath: /tmp
+      volumes:
+      - name: audio-models
+        persistentVolumeClaim:
+          claimName: jarvis-audio-models
+      - name: temp-storage
+        emptyDir:
+          sizeLimit: "1Gi"
+      nodeSelector:
+        node-type: compute-intensive
+      tolerations:
+      - key: "node-type"
+        operator: "Equal"
+        value: "compute-intensive"
+        effect: "NoSchedule"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jarvis-audio
+  namespace: jarvis-v2
+  labels:
+    app: jarvis-audio
+    version: "2.0"
+    component: audio
+spec:
+  type: ClusterIP
+  selector:
+    app: jarvis-audio
+  ports:
+  - port: 8001
+    targetPort: 8001
+    name: http
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: jarvis-audio-hpa
+  namespace: jarvis-v2
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: jarvis-audio
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30

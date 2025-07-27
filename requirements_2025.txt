@@ -1,0 +1,89 @@
+# JARVIS Voice Assistant 2.0 - Modern Requirements (2025)
+# Core AI และ ML Libraries
+torch>=2.3.0
+transformers>=4.44.0
+accelerate>=0.32.0
+bitsandbytes>=0.44.0
+sentence-transformers>=3.0.1
+faiss-cpu>=1.8.0
+
+# Advanced Voice Processing
+faster-whisper>=1.0.3
+TTS>=0.24.0
+sounddevice>=0.5.0
+librosa>=0.10.2
+pydub>=0.25.1
+speechrecognition>=3.10.4
+
+# Modern Web Framework
+fastapi>=0.112.0
+uvicorn[standard]>=0.30.0
+websockets>=13.0
+aiohttp>=3.10.0
+httpx>=0.27.0
+
+# GUI Framework
+PyQt6>=6.7.0
+PyQt6-WebEngine>=6.7.0
+
+# Modern AI Models Support
+huggingface-hub>=0.24.0
+tokenizers>=0.19.0
+safetensors>=0.4.0
+datasets>=2.20.0
+
+# Computer Vision & Multimodal
+opencv-python>=4.10.0
+Pillow>=10.4.0
+easyocr>=1.7.1
+ultralytics>=8.2.0
+timm>=1.0.0
+
+# Thai Language Processing (Latest)
+pythainlp>=5.0.4
+thai-segmenter>=0.4.2
+
+# Database & Vector Store
+chromadb>=0.5.0
+supabase>=2.7.0
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.0
+
+# Modern Utilities
+pydantic>=2.8.0
+pydantic-settings>=2.4.0
+python-dotenv>=1.0.1
+PyYAML>=6.0.2
+click>=8.1.7
+rich>=13.7.0
+tqdm>=4.66.0
+
+# HTTP & API
+requests>=2.32.0
+aiofiles>=24.1.0
+jinja2>=3.1.4
+
+# Audio/Video Processing
+ffmpeg-python>=0.2.0
+moviepy>=1.0.3
+
+# Development Tools
+pytest>=8.3.0
+pytest-asyncio>=0.23.0
+black>=24.8.0
+ruff>=0.5.0
+
+# Performance Monitoring
+psutil>=6.0.0
+nvidia-ml-py3>=7.352.0
+
+# Security
+cryptography>=43.0.0
+passlib>=1.7.4
+
+# Additional Utilities
+numpy>=2.0.0
+scipy>=1.14.0
+pandas>=2.2.0
+scikit-learn>=1.5.0
+matplotlib>=3.9.0

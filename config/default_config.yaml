@@ -1,0 +1,38 @@
+ai:
+  llm:
+    device: auto
+    fallback_model: microsoft/DialoGPT-medium
+    max_context_length: 8192
+    max_tokens: 512
+    model_name: deepseek-ai/deepseek-r1-distill-llama-8b
+    quantization: 8bit
+    temperature: 0.7
+    timeout: 30
+rag:
+  chunk_overlap: 25
+  chunk_size: 256
+  embedding_model: mixedbread-ai/mxbai-embed-large-v1
+  max_context_length: 2048
+  similarity_threshold: 0.2
+  top_k: 10
+  vector_db_path: data/vectordb
+system:
+  auto_save_interval: 300
+  log_file: logs/jarvis.log
+  log_level: INFO
+ui:
+  colors:
+    accent: '#ff6b35'
+    background: '#1a1a1a'
+    primary: '#00d4ff'
+    secondary: '#0099cc'
+  theme: dark
+voice:
+  chunk_size: 1024
+  sample_rate: 16000
+  tts:
+    model_path: models/f5_tts
+    voice_clone_path: assets/voices/jarvis_voice.wav
+  whisper:
+    language: auto
+    model_size: base

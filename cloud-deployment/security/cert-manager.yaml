@@ -1,0 +1,349 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    name: cert-manager
+    cert-manager.io/disable-validation: "true"
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@jarvis.yourdomain.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+          podTemplate:
+            spec:
+              nodeSelector:
+                "kubernetes.io/os": linux
+    - dns01:
+        cloudDNS:
+          project: your-project-id
+          serviceAccountSecretRef:
+            name: clouddns-dns01-solver-svc-acct
+            key: key.json
+      selector:
+        dnsZones:
+        - "jarvis.yourdomain.com"
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: admin@jarvis.yourdomain.com
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+          podTemplate:
+            spec:
+              nodeSelector:
+                "kubernetes.io/os": linux
+    - dns01:
+        cloudDNS:
+          project: your-project-id
+          serviceAccountSecretRef:
+            name: clouddns-dns01-solver-svc-acct
+            key: key.json
+      selector:
+        dnsZones:
+        - "jarvis.yourdomain.com"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: clouddns-dns01-solver-svc-acct
+  namespace: cert-manager
+type: Opaque
+data:
+  key.json: |
+    # Base64 encoded GCP service account key JSON
+    # Replace with your actual service account key
+    ewogICJ0eXBlIjogInNlcnZpY2VfYWNjb3VudCIsCiAgInByb2plY3RfaWQiOiAieW91ci1wcm9qZWN0LWlkIiwKICAicHJpdmF0ZV9rZXlfaWQiOiAieW91ci1wcml2YXRlLWtleS1pZCIsCiAgInByaXZhdGVfa2V5IjogIi0tLS0tQkVHSU4gUFJJVkFURSBLRVktLS0tLVxuWW91ciBwcml2YXRlIGtleSBjb250ZW50IGhlcmVcbi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS1cbiIsCiAgImNsaWVudF9lbWFpbCI6ICJ5b3VyLXNlcnZpY2UtYWNjb3VudEB5b3VyLXByb2plY3QuaWFtLmdzZXJ2aWNlYWNjb3VudC5jb20iLAogICJjbGllbnRfaWQiOiAieW91ci1jbGllbnQtaWQiLAogICJhdXRoX3VyaSI6ICJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20vby9vYXV0aDIvYXV0aCIsCiAgInRva2VuX3VyaSI6ICJodHRwczovL29hdXRoMi5nb29nbGVhcGlzLmNvbS90b2tlbiIKfQ==
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: jarvis-main-tls
+  namespace: jarvis-v2
+spec:
+  secretName: jarvis-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: jarvis.yourdomain.com
+  dnsNames:
+  - jarvis.yourdomain.com
+  - api.jarvis.yourdomain.com
+  - audio.jarvis.yourdomain.com
+  - mobile.jarvis.yourdomain.com
+  - auth.jarvis.yourdomain.com
+  - ws.jarvis.yourdomain.com
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+  renewBefore: 720h # 30 days
+  duration: 2160h # 90 days
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: jarvis-monitoring-tls
+  namespace: jarvis-v2-monitoring
+spec:
+  secretName: jarvis-monitoring-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: monitoring.jarvis.yourdomain.com
+  dnsNames:
+  - monitoring.jarvis.yourdomain.com
+  - grafana.jarvis.yourdomain.com
+  - prometheus.jarvis.yourdomain.com
+  - alertmanager.jarvis.yourdomain.com
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+  renewBefore: 720h # 30 days
+  duration: 2160h # 90 days
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: jarvis-vault-tls
+  namespace: jarvis-v2
+spec:
+  secretName: vault-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: vault.jarvis.yourdomain.com
+  dnsNames:
+  - vault.jarvis.yourdomain.com
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+  renewBefore: 720h # 30 days
+  duration: 2160h # 90 days
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: jarvis-internal-ca
+  namespace: jarvis-v2
+spec:
+  secretName: jarvis-internal-ca-secret
+  issuerRef:
+    name: jarvis-ca-issuer
+    kind: Issuer
+  commonName: "Jarvis Internal CA"
+  isCA: true
+  usages:
+  - digital signature
+  - key encipherment
+  - cert sign
+  duration: 8760h # 1 year
+  renewBefore: 720h # 30 days
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: jarvis-ca-issuer
+  namespace: jarvis-v2
+spec:
+  ca:
+    secretName: jarvis-internal-ca-secret
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: jarvis-internal-service-certs
+  namespace: jarvis-v2
+spec:
+  secretName: jarvis-internal-service-certs
+  issuerRef:
+    name: jarvis-ca-issuer
+    kind: Issuer
+  commonName: jarvis-internal-services
+  dnsNames:
+  - jarvis-core-service
+  - jarvis-core-service.jarvis-v2.svc.cluster.local
+  - jarvis-audio-service
+  - jarvis-audio-service.jarvis-v2.svc.cluster.local
+  - jarvis-mobile-service
+  - jarvis-mobile-service.jarvis-v2.svc.cluster.local
+  - jarvis-redis-service
+  - jarvis-redis-service.jarvis-v2.svc.cluster.local
+  - jarvis-mongodb-service
+  - jarvis-mongodb-service.jarvis-v2.svc.cluster.local
+  - localhost
+  - 127.0.0.1
+  ipAddresses:
+  - 127.0.0.1
+  - 10.0.0.1
+  usages:
+  - digital signature
+  - key encipherment
+  - server auth
+  - client auth
+  duration: 2160h # 90 days
+  renewBefore: 720h # 30 days
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cert-manager-webhook-config
+  namespace: cert-manager
+data:
+  config.yaml: |
+    apiVersion: v1
+    kind: Config
+    clusters:
+    - name: jarvis-cluster
+      cluster:
+        certificate-authority-data: ${CLUSTER_CA_CERT}
+        server: ${CLUSTER_ENDPOINT}
+    users:
+    - name: cert-manager-webhook
+      user:
+        token: ${WEBHOOK_TOKEN}
+    contexts:
+    - name: jarvis-context
+      context:
+        cluster: jarvis-cluster
+        user: cert-manager-webhook
+    current-context: jarvis-context
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cert-renewal-check
+  namespace: cert-manager
+spec:
+  schedule: "0 6 * * *"  # Daily at 6 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: cert-checker
+            image: quay.io/jetstack/cert-manager-ctl:v1.13.2
+            command:
+            - /bin/sh
+            - -c
+            - |
+              # Check certificate expiry
+              kubectl get certificates -A -o json | jq -r '.items[] | select(.status.notAfter != null) | select(((.status.notAfter | fromdateiso8601) - now) < (30 * 24 * 3600)) | "\(.metadata.namespace)/\(.metadata.name) expires on \(.status.notAfter)"'
+              
+              # Renew certificates that are close to expiry
+              kubectl annotate certificates -A cert-manager.io/issue-temporary-certificate="true" --overwrite
+              
+              # Check for failed certificate requests
+              kubectl get certificaterequests -A -o json | jq -r '.items[] | select(.status.conditions[]?.type == "Ready" and .status.conditions[]?.status == "False") | "\(.metadata.namespace)/\(.metadata.name) has failed: \(.status.conditions[]?.message)"'
+            env:
+            - name: KUBECONFIG
+              value: "/etc/kubeconfig/config"
+            volumeMounts:
+            - name: kubeconfig
+              mountPath: /etc/kubeconfig
+              readOnly: true
+          volumes:
+          - name: kubeconfig
+            configMap:
+              name: cert-manager-webhook-config
+          restartPolicy: OnFailure
+      backoffLimit: 3
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cert-manager-network-policy
+  namespace: cert-manager
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: cert-manager-webhook
+    ports:
+    - protocol: TCP
+      port: 9402
+    - protocol: TCP
+      port: 6060
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 6443
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cert-manager-metrics
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/name: cert-manager
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+  endpoints:
+  - port: tcp-prometheus-servicemonitor
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cert-manager-webhook-metrics
+  namespace: cert-manager
+  labels:
+    app.kubernetes.io/name: cert-manager-webhook
+spec:
+  ports:
+  - name: tcp-prometheus-servicemonitor
+    port: 9402
+    targetPort: 9402
+  selector:
+    app.kubernetes.io/name: cert-manager-webhook

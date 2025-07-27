@@ -1,0 +1,43 @@
+{
+  "jarvis_info": [
+    {
+      "content": "JARVIS is an advanced AI voice assistant designed for natural conversation in English and Thai languages.",
+      "category": "general",
+      "type": "core_info"
+    },
+    {
+      "content": "JARVIS uses DeepSeek-R1 for language understanding and mxbai-embed-large for document retrieval and search.",
+      "category": "technical",
+      "type": "ai_models"
+    },
+    {
+      "content": "JARVIS can answer questions, remember conversations, learn from user interactions, and integrate with various APIs.",
+      "category": "capabilities",
+      "type": "features"
+    }
+  ],
+  "thai_support": [
+    {
+      "content": "JARVIS สามารถสนทนาภาษาไทยได้อย่างเป็นธรรมชาติ และเข้าใจบริบททางวัฒนธรรมไทย",
+      "category": "languages",
+      "type": "thai_capability"
+    },
+    {
+      "content": "ระบบรองรับการแปลภาษาไทย-อังกฤษ และสามารถตอบคำถามในทั้งสองภาษา",
+      "category": "languages",
+      "type": "translation"
+    }
+  ],
+  "voice_features": [
+    {
+      "content": "JARVIS features advanced voice recognition using Faster-Whisper and sci-fi voice synthesis.",
+      "category": "voice",
+      "type": "recognition"
+    },
+    {
+      "content": "Wake word detection with 'Hey JARVIS' activation and continuous listening capabilities.",
+      "category": "voice",
+      "type": "wake_word"
+    }
+  ]
+}

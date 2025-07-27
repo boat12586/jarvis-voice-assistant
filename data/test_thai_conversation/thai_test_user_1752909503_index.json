@@ -1,0 +1,55 @@
+{
+  "turns": [
+    {
+      "turn_id": "thai_test_user_1752909503_turn_1",
+      "timestamp": 1752909504.3113525,
+      "intent": "action_request",
+      "user_language": "th",
+      "confidence": 0.99
+    },
+    {
+      "turn_id": "thai_test_user_1752909503_turn_2",
+      "timestamp": 1752909504.326305,
+      "intent": "action_request",
+      "user_language": "th",
+      "confidence": 1.0
+    },
+    {
+      "turn_id": "thai_test_user_1752909503_turn_3",
+      "timestamp": 1752909504.3397965,
+      "intent": "action_request",
+      "user_language": "th",
+      "confidence": 1.0
+    },
+    {
+      "turn_id": "thai_test_user_1752909503_turn_4",
+      "timestamp": 1752909504.3518617,
+      "intent": "action_request",
+      "user_language": "th",
+      "confidence": 1.0
+    },
+    {
+      "turn_id": "thai_test_user_1752909503_turn_5",
+      "timestamp": 1752909504.368281,
+      "intent": "action_request",
+      "user_language": "th",
+      "confidence": 1.0
+    },
+    {
+      "turn_id": "thai_test_user_1752909503_turn_6",
+      "timestamp": 1752909504.3819766,
+      "intent": "system_control",
+      "user_language": "th",
+      "confidence": 1.0
+    },
+    {
+      "turn_id": "thai_test_user_1752909503_turn_7",
+      "timestamp": 1752909504.3931515,
+      "intent": "action_request",
+      "user_language": "th",
+      "confidence": 1.0
+    }
+  ],
+  "last_updated": 1752909504.3943696,
+  "turn_count": 7
+}

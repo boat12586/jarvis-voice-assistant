@@ -1,0 +1,207 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jarvis-plugin-storage
+  namespace: jarvis-v2
+  labels:
+    app: jarvis-core
+    component: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jarvis-audio-models
+  namespace: jarvis-v2
+  labels:
+    app: jarvis-audio
+    component: storage
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jarvis-logs
+  namespace: jarvis-v2
+  labels:
+    component: logging
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-client
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jarvis-backups
+  namespace: jarvis-v2
+  labels:
+    component: backup
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: persistent-ssd
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast-ssd
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+  zones: us-central1-a,us-central1-b
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: persistent-ssd
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-ssd
+  replication-type: regional-pd
+  zones: us-central1-a,us-central1-b
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-client
+provisioner: cluster.local/nfs-client-provisioner
+parameters:
+  archiveOnDelete: "false"
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: jarvis-backup-job
+  namespace: jarvis-v2
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: jarvis/backup:2.0.0
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # MongoDB backup
+              mongodump --host jarvis-mongodb-service:27017 --out /backup/mongodb/$(date +%Y%m%d_%H%M%S)
+              
+              # Redis backup
+              redis-cli -h jarvis-redis-service -p 6379 BGSAVE
+              
+              # Compress and upload to cloud storage
+              tar -czf /backup/jarvis-backup-$(date +%Y%m%d_%H%M%S).tar.gz /backup/
+              
+              # Upload to S3 (or GCS)
+              aws s3 cp /backup/jarvis-backup-$(date +%Y%m%d_%H%M%S).tar.gz s3://jarvis-backups/
+              
+              # Cleanup old backups (keep last 30 days)
+              find /backup -name "*.tar.gz" -mtime +30 -delete
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: jarvis-backup-credentials
+                  key: aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: jarvis-backup-credentials
+                  key: aws-secret-access-key
+            - name: AWS_DEFAULT_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: jarvis-backup-credentials
+                  key: aws-region
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: jarvis-backups
+          restartPolicy: OnFailure
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: jarvis-cleanup-job
+  namespace: jarvis-v2
+spec:
+  schedule: "0 3 * * *"  # Daily at 3 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: cleanup
+            image: jarvis/cleanup:2.0.0
+            command:
+            - /bin/bash
+            - -c
+            - |
+              # Cleanup old logs
+              find /var/log -name "*.log" -mtime +7 -delete
+              
+              # Cleanup temp files
+              find /tmp -type f -mtime +1 -delete
+              
+              # Cleanup old audio files
+              find /audio-temp -name "*.wav" -mtime +1 -delete
+              
+              # Database cleanup
+              mongo --host jarvis-mongodb-service:27017 --eval "
+                db.system_logs.deleteMany({timestamp: {\$lt: new Date(Date.now() - 7*24*60*60*1000)}});
+                db.sessions.deleteMany({last_activity: {\$lt: new Date(Date.now() - 24*60*60*1000)}});
+              "
+              
+              # Redis cleanup
+              redis-cli -h jarvis-redis-service -p 6379 FLUSHDB
+            volumeMounts:
+            - name: log-storage
+              mountPath: /var/log
+            - name: temp-storage
+              mountPath: /tmp
+            - name: audio-temp
+              mountPath: /audio-temp
+          volumes:
+          - name: log-storage
+            persistentVolumeClaim:
+              claimName: jarvis-logs
+          - name: temp-storage
+            emptyDir: {}
+          - name: audio-temp
+            emptyDir: {}
+          restartPolicy: OnFailure

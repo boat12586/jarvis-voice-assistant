@@ -1,0 +1,395 @@
+{
+  "command_parsing": [
+    {
+      "input": "Hello JARVIS",
+      "language": "en",
+      "detected_language": "en",
+      "intent": "greeting",
+      "expected_intent": "greeting",
+      "confidence": 0.78375,
+      "entities": {},
+      "success": true
+    },
+    {
+      "input": "What is artificial intelligence?",
+      "language": "en",
+      "detected_language": "en",
+      "intent": "information_request",
+      "expected_intent": "information_request",
+      "confidence": 0.6890625,
+      "entities": {},
+      "success": true
+    },
+    {
+      "input": "How do I use this feature?",
+      "language": "en",
+      "detected_language": "en",
+      "intent": "how_to_request",
+      "expected_intent": "how_to_request",
+      "confidence": 0.6923076923076923,
+      "entities": {},
+      "success": true
+    },
+    {
+      "input": "Please open the settings",
+      "language": "en",
+      "detected_language": "en",
+      "intent": "system_control",
+      "expected_intent": "action_request",
+      "confidence": 0.64,
+      "entities": {
+        "actions": [
+          "open"
+        ]
+      },
+      "success": true
+    },
+    {
+      "input": "Turn up the volume",
+      "language": "en",
+      "detected_language": "en",
+      "intent": "action_request",
+      "expected_intent": "system_control",
+      "confidence": 0.475,
+      "entities": {},
+      "success": true
+    },
+    {
+      "input": "สวัสดี จาร์วิส",
+      "language": "th",
+      "detected_language": "th",
+      "intent": "action_request",
+      "expected_intent": "greeting",
+      "confidence": 0.46875,
+      "entities": {},
+      "success": true
+    },
+    {
+      "input": "ปัญญาประดิษฐ์คืออะไร",
+      "language": "th",
+      "detected_language": "th",
+      "intent": "action_request",
+      "expected_intent": "information_request",
+      "confidence": 0.49720588235294116,
+      "entities": {},
+      "success": true
+    },
+    {
+      "input": "ช่วยเปิดการตั้งค่าหน่อย",
+      "language": "th",
+      "detected_language": "th",
+      "intent": "action_request",
+      "expected_intent": "action_request",
+      "confidence": 0.525,
+      "entities": {},
+      "success": true
+    },
+    {
+      "input": "เปิดเสียงให้ดังขึ้น",
+      "language": "th",
+      "detected_language": "th",
+      "intent": "system_control",
+      "expected_intent": "system_control",
+      "confidence": 0.7869473684210526,
+      "entities": {},
+      "success": true
+    },
+    {
+      "input": "Hello จาร์วิส",
+      "language": "auto",
+      "detected_language": "th",
+      "intent": "greeting",
+      "expected_intent": "greeting",
+      "confidence": 0.8133461538461538,
+      "entities": {},
+      "success": true
+    }
+  ],
+  "thai_processing": [
+    {
+      "input": "สวัสดีครับ จาร์วิส",
+      "processed_text": "สวัสดีครับ จาร์วิส",
+      "language": "thai",
+      "confidence": 1.0,
+      "features": {
+        "has_tone_marks": false,
+        "vowel_count": 6,
+        "consonant_count": 11,
+        "politeness_level": 1,
+        "polite_particles": [
+          "ครับ"
+        ],
+        "formality_level": 0,
+        "formal_pronouns": [],
+        "known_expressions": [
+          {
+            "thai": "สวัสดี",
+            "english": "hello/goodbye",
+            "context": "universal greeting"
+          }
+        ],
+        "dictionary_matches": [
+          {
+            "thai": "จาร์วิส",
+            "english": "JARVIS"
+          }
+        ]
+      },
+      "cultural_context": "polite",
+      "ai_enhancement": "Context: The user is communicating in Thai language. Key translations: สวัสดี means hello/goodbye Cultural context: polite The user is speaking politely",
+      "success": true
+    },
+    {
+      "input": "ขอบคุณมากครับ",
+      "processed_text": "ขอบคุณมากครับ",
+      "language": "thai",
+      "confidence": 1.0,
+      "features": {
+        "has_tone_marks": false,
+        "vowel_count": 3,
+        "consonant_count": 10,
+        "politeness_level": 1,
+        "polite_particles": [
+          "ครับ"
+        ],
+        "formality_level": 1,
+        "formal_pronouns": [
+          "คุณ"
+        ],
+        "known_expressions": [
+          {
+            "thai": "ขอบคุณ",
+            "english": "thank you",
+            "context": "gratitude expression"
+          }
+        ],
+        "dictionary_matches": []
+      },
+      "cultural_context": "polite, formal",
+      "ai_enhancement": "Context: The user is communicating in Thai language. Key translations: ขอบคุณ means thank you Cultural context: polite, formal The user is speaking politely The user is speaking formally",
+      "success": true
+    },
+    {
+      "input": "กรุณาช่วยอธิบายเกี่ยวกับปัญญาประดิษฐ์",
+      "processed_text": "กรุณาช่วยอธิบายเกี่ยวกับปัญญาประดิษฐ์",
+      "language": "thai",
+      "confidence": 1.0,
+      "features": {
+        "has_tone_marks": true,
+        "vowel_count": 14,
+        "consonant_count": 23,
+        "politeness_level": 0,
+        "polite_particles": [],
+        "formality_level": 0,
+        "formal_pronouns": [],
+        "known_expressions": [
+          {
+            "thai": "กรุณา",
+            "english": "please",
+            "context": "polite request"
+          }
+        ],
+        "dictionary_matches": [
+          {
+            "thai": "ปัญญาประดิษฐ์",
+            "english": "artificial intelligence"
+          },
+          {
+            "thai": "ช่วย",
+            "english": "help"
+          },
+          {
+            "thai": "อธิบาย",
+            "english": "explain"
+          }
+        ]
+      },
+      "cultural_context": null,
+      "ai_enhancement": "Context: The user is communicating in Thai language. Key translations: กรุณา means please",
+      "success": true
+    },
+    {
+      "input": "วันนี้อากาศเป็นอย่างไร",
+      "processed_text": "วันนี้อากาศเป็นอย่างไร",
+      "language": "thai",
+      "confidence": 1.0,
+      "features": {
+        "has_tone_marks": true,
+        "vowel_count": 10,
+        "consonant_count": 12,
+        "politeness_level": 0,
+        "polite_particles": [],
+        "formality_level": 0,
+        "formal_pronouns": [],
+        "known_expressions": [],
+        "dictionary_matches": [
+          {
+            "thai": "วันนี้",
+            "english": "today"
+          }
+        ]
+      },
+      "cultural_context": null,
+      "ai_enhancement": "Context: The user is communicating in Thai language.",
+      "success": true
+    },
+    {
+      "input": "Hello สวัสดี mixed language test",
+      "processed_text": "Hello สวัสดี mixed language test",
+      "language": "mixed",
+      "confidence": 0.7857142857142857,
+      "features": {
+        "is_mixed": true,
+        "parts": [
+          {
+            "text": "Hello",
+            "language": "english",
+            "processed": "Hello",
+            "features": {}
+          },
+          {
+            "text": "สวัสดี",
+            "language": "thai",
+            "processed": "สวัสดี",
+            "features": {
+              "has_tone_marks": false,
+              "vowel_count": 2,
+              "consonant_count": 4,
+              "politeness_level": 0,
+              "polite_particles": [],
+              "formality_level": 0,
+              "formal_pronouns": [],
+              "known_expressions": [
+                {
+                  "thai": "สวัสดี",
+                  "english": "hello/goodbye",
+                  "context": "universal greeting"
+                }
+              ],
+              "dictionary_matches": []
+            }
+          },
+          {
+            "text": "mixed language test",
+            "language": "english",
+            "processed": "mixed language test",
+            "features": {}
+          }
+        ],
+        "thai_ratio": 0.21428571428571427,
+        "english_ratio": 0.7857142857142857
+      },
+      "cultural_context": null,
+      "ai_enhancement": "Context: The user is using both Thai and English languages.",
+      "success": true
+    }
+  ],
+  "conversation_memory": {
+    "session_id": "test_user_1753071207",
+    "turns_added": 3,
+    "context_retrieved": 3,
+    "summary": {
+      "session_id": "test_user_1753071207",
+      "duration_minutes": 0.003051606814066569,
+      "turn_count": 3,
+      "languages_used": [
+        "en",
+        "th"
+      ],
+      "avg_confidence": 0.9166666666666666,
+      "primary_intents": [
+        [
+          "greeting",
+          2
+        ],
+        [
+          "information_request",
+          1
+        ]
+      ],
+      "extracted_entities": {
+        "topics": [
+          "artificial intelligence"
+        ]
+      },
+      "active_topics": [
+        "artificial intelligence"
+      ],
+      "conversation_tone": "neutral",
+      "user_preferences": {
+        "politeness_level": "high"
+      }
+    },
+    "success": true
+  },
+  "integration_logic": {
+    "session_id": "test_user_1753071211",
+    "pipeline_results": [
+      {
+        "input": "Hey JARVIS, what's the weather today?",
+        "language": "en",
+        "intent": "greeting",
+        "confidence": 0.688108108108108,
+        "turn_id": "test_user_1753071211_turn_1",
+        "success": true
+      },
+      {
+        "input": "จาร์วิส ปัญญาประดิษฐ์คืออะไร",
+        "language": "th",
+        "intent": "action_request",
+        "confidence": 0.48719999999999997,
+        "turn_id": "test_user_1753071211_turn_2",
+        "success": true
+      },
+      {
+        "input": "Can you help me with machine learning?",
+        "language": "en",
+        "intent": "action_request",
+        "confidence": 0.425,
+        "turn_id": "test_user_1753071211_turn_3",
+        "success": true
+      },
+      {
+        "input": "ขอบคุณครับ",
+        "language": "th",
+        "intent": "action_request",
+        "confidence": 0.4935,
+        "turn_id": "test_user_1753071211_turn_4",
+        "success": true
+      }
+    ],
+    "final_summary": {
+      "session_id": "test_user_1753071211",
+      "duration_minutes": 0.0017392754554748536,
+      "turn_count": 4,
+      "languages_used": [
+        "en",
+        "th"
+      ],
+      "avg_confidence": 0.523452027027027,
+      "primary_intents": [
+        [
+          "action_request",
+          3
+        ],
+        [
+          "greeting",
+          1
+        ]
+      ],
+      "extracted_entities": {
+        "time": [
+          "today"
+        ]
+      },
+      "active_topics": [],
+      "conversation_tone": "polite",
+      "user_preferences": {
+        "communication_style": "formal",
+        "politeness_level": "high"
+      }
+    },
+    "success_rate": 100.0,
+    "success": true
+  }
+}

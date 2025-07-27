@@ -1,0 +1,298 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth2-proxy
+  namespace: jarvis-v2
+  labels:
+    app: oauth2-proxy
+    version: "7.5.1"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: oauth2-proxy
+        version: "7.5.1"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - oauth2-proxy
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: oauth2-proxy
+        image: quay.io/oauth2-proxy/oauth2-proxy:v7.5.1
+        args:
+        - --provider=google
+        - --email-domain=*
+        - --upstream=file:///dev/null
+        - --http-address=0.0.0.0:4180
+        - --reverse-proxy=true
+        - --set-xauthrequest=true
+        - --pass-access-token=true
+        - --pass-user-headers=true
+        - --set-authorization-header=true
+        - --cookie-secure=true
+        - --cookie-httponly=true
+        - --cookie-samesite=lax
+        - --cookie-expire=24h
+        - --cookie-refresh=1h
+        - --skip-provider-button=true
+        - --whitelist-domain=.jarvis.yourdomain.com
+        - --redirect-url=https://auth.jarvis.yourdomain.com/oauth2/callback
+        - --silence-ping-logging=true
+        - --request-logging=false
+        - --standard-logging=true
+        - --auth-logging=true
+        - --skip-auth-regex=^/health$
+        - --skip-auth-regex=^/metrics$
+        - --skip-auth-regex=^/api/v2/health$
+        - --skip-auth-regex=^/api/v2/public/.*$
+        - --skip-auth-regex=^/ws/public/.*$
+        env:
+        - name: OAUTH2_PROXY_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: oauth2-proxy-secrets
+              key: client-id
+        - name: OAUTH2_PROXY_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: oauth2-proxy-secrets
+              key: client-secret
+        - name: OAUTH2_PROXY_COOKIE_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: oauth2-proxy-secrets
+              key: cookie-secret
+        - name: OAUTH2_PROXY_COOKIE_NAME
+          value: "_oauth2_proxy_jarvis"
+        - name: OAUTH2_PROXY_COOKIE_DOMAIN
+          value: ".jarvis.yourdomain.com"
+        ports:
+        - containerPort: 4180
+          name: http
+          protocol: TCP
+        - containerPort: 44180
+          name: metrics
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: 4180
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ping
+            port: 4180
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 2000
+          runAsGroup: 2000
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 2000
+        runAsGroup: 2000
+        fsGroup: 2000
+      serviceAccountName: oauth2-proxy-service-account
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oauth2-proxy
+  namespace: jarvis-v2
+  labels:
+    app: oauth2-proxy
+spec:
+  type: ClusterIP
+  ports:
+  - port: 4180
+    targetPort: 4180
+    protocol: TCP
+    name: http
+  - port: 44180
+    targetPort: 44180
+    protocol: TCP
+    name: metrics
+  selector:
+    app: oauth2-proxy
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oauth2-proxy-service-account
+  namespace: jarvis-v2
+  annotations:
+    iam.gke.io/gcp-service-account: oauth2-proxy-sa@your-project-id.iam.gserviceaccount.com
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: oauth2-proxy-secrets
+  namespace: jarvis-v2
+type: Opaque
+stringData:
+  # Google OAuth2 credentials
+  client-id: "your-google-oauth2-client-id.apps.googleusercontent.com"
+  client-secret: "your-google-oauth2-client-secret"
+  # Generate with: python -c 'import os,base64; print(base64.b64encode(os.urandom(32)).decode())'
+  cookie-secret: "your-32-byte-base64-encoded-cookie-secret"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oauth2-proxy-ingress
+  namespace: jarvis-v2
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - auth.jarvis.yourdomain.com
+    secretName: oauth2-proxy-tls-secret
+  rules:
+  - host: auth.jarvis.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: oauth2-proxy
+            port:
+              number: 4180
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: oauth2-proxy-role
+  namespace: jarvis-v2
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: oauth2-proxy-role-binding
+  namespace: jarvis-v2
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: oauth2-proxy-role
+subjects:
+- kind: ServiceAccount
+  name: oauth2-proxy-service-account
+  namespace: jarvis-v2
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: oauth2-proxy-network-policy
+  namespace: jarvis-v2
+spec:
+  podSelector:
+    matchLabels:
+      app: oauth2-proxy
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app: jarvis-nginx
+    ports:
+    - protocol: TCP
+      port: 4180
+    - protocol: TCP
+      port: 44180
+  egress:
+  - to: {}
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: oauth2-proxy-hpa
+  namespace: jarvis-v2
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: oauth2-proxy
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 25
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 30
